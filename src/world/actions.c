@@ -46,8 +46,8 @@ f32 GravityParamsStartJump[] = { 15.7566404343f, -7.38624f, 3.44693994522f, -0.7
 f32 GravityParamsStartFall[] = { 0.154342994094f, -0.350080013275f, -0.182262003422f, 0.0115200001746f };
 
  // default move speeds
-f32 D_800F7B70 = 2.0f; // walk
-f32 D_800F7B74 = 4.0f; // run
+f32 DefaultWalkSpeed = 2.0f; // walk
+f32 DefaultMoveSpeed = 4.0f; // run
 f32 D_800F7B78 = 32.0f; // max jump
 f32 D_800F7B7C = -32.0f; // ???
 
