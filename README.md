@@ -37,3 +37,10 @@ Also see our website at [papermar.io](https://papermar.io/).
 
 [discord]: https://discord.gg/PgcMpQTzh5
 [discord-badge]: https://img.shields.io/discord/1141775228440158338?color=%237289DA&logo=discord&logoColor=ffffff
+
+
+Note.
+
+ ./configure --non-matching --shift 
+ ninja
+make
