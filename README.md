@@ -41,8 +41,10 @@ Also see our website at [papermar.io](https://papermar.io/).
 
 Note.
 
- ./configure --non-matching --shift 
+* ./install_compilers.sh
+
+* ./configure --non-matching --shift 
  
-ninja
+* ninja
  
-make
+* make
