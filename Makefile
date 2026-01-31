@@ -225,8 +225,162 @@ PAUSE_SRCS := \
     src/pause/pause_styles.c \
     src/pause/pause_tabs.c
 
-# OS/libultra
-OS_SRCS := $(wildcard src/os/*.c src/os/nusys/*.c)
+# OS/libultra - explicit list from ninja build
+OS_SRCS := \
+    src/os/afterprenmi.c \
+    src/os/ai.c \
+    src/os/aigetlength.c \
+    src/os/aigetstatus.c \
+    src/os/aisetfrequency.c \
+    src/os/aisetnextbuf.c \
+    src/os/cartrominit.c \
+    src/os/contpfs.c \
+    src/os/contquery.c \
+    src/os/contramread.c \
+    src/os/contramwrite.c \
+    src/os/contreaddata.c \
+    src/os/controller.c \
+    src/os/coss.c \
+    src/os/crc.c \
+    src/os/createmesgqueue.c \
+    src/os/createthread.c \
+    src/os/destroythread.c \
+    src/os/devmgr.c \
+    src/os/epidma.c \
+    src/os/epilinkhandle.c \
+    src/os/epirawdma.c \
+    src/os/epirawread.c \
+    src/os/epirawwrite.c \
+    src/os/epiread.c \
+    src/os/epiwrite.c \
+    src/os/frustum.c \
+    src/os/getactivequeue.c \
+    src/os/getthreadpri.c \
+    src/os/gettime.c \
+    src/os/guLookAt.c \
+    src/os/guMtxCat.c \
+    src/os/guMtxXFMF.c \
+    src/os/guMtxXFML.c \
+    src/os/guOrtho.c \
+    src/os/guRotate.c \
+    src/os/gu_matrix.c \
+    src/os/initialize.c \
+    src/os/jammesg.c \
+    src/os/ldiv.c \
+    src/os/lookathil.c \
+    src/os/lookatref.c \
+    src/os/memset.c \
+    src/os/motor.c \
+    src/os/osFlash.c \
+    src/os/osSiDeviceBusy.c \
+    src/os/perspective.c \
+    src/os/pfsallocatefile.c \
+    src/os/pfschecker.c \
+    src/os/pfsdeletefile.c \
+    src/os/pfsfilestate.c \
+    src/os/pfsfindfile.c \
+    src/os/pfsfreeblocks.c \
+    src/os/pfsgetstatus.c \
+    src/os/pfsinitpak.c \
+    src/os/pfsisplug.c \
+    src/os/pfsnumfiles.c \
+    src/os/pfsreadwritefile.c \
+    src/os/pfsrepairid.c \
+    src/os/pfsselectbank.c \
+    src/os/piacs.c \
+    src/os/pigetcmdq.c \
+    src/os/pimgr.c \
+    src/os/pirawdma.c \
+    src/os/position.c \
+    src/os/recvmesg.c \
+    src/os/resetglobalintmask.c \
+    src/os/rotateRPY.c \
+    src/os/sendmesg.c \
+    src/os/setglobalintmask.c \
+    src/os/seteventmesg.c \
+    src/os/setthreadpri.c \
+    src/os/settime.c \
+    src/os/settimer.c \
+    src/os/siacs.c \
+    src/os/sins.c \
+    src/os/sirawdma.c \
+    src/os/sirawread.c \
+    src/os/sirawwrite.c \
+    src/os/sp.c \
+    src/os/spgetstat.c \
+    src/os/sprintf.c \
+    src/os/sprawdma.c \
+    src/os/spsetpc.c \
+    src/os/spsetstat.c \
+    src/os/sptask.c \
+    src/os/sptaskyield.c \
+    src/os/sptaskyielded.c \
+    src/os/sqrtf.c \
+    src/os/startthread.c \
+    src/os/stopthread.c \
+    src/os/strcmp.c \
+    src/os/strcpy.c \
+    src/os/string.c \
+    src/os/thread.c \
+    src/os/timerintr.c \
+    src/os/vi.c \
+    src/os/viblack.c \
+    src/os/vigetcurrcontext.c \
+    src/os/vigetcurrframebuf.c \
+    src/os/vigetmode.c \
+    src/os/vigetnextframebuf.c \
+    src/os/vimgr.c \
+    src/os/vimodempallan1.c \
+    src/os/vimodentsclan1.c \
+    src/os/vimodepallan1.c \
+    src/os/virepeatline.c \
+    src/os/visetevent.c \
+    src/os/visetmode.c \
+    src/os/visetspecial.c \
+    src/os/visetyscale.c \
+    src/os/viswapbuf.c \
+    src/os/viswapcontext.c \
+    src/os/virtualtophysical.c \
+    src/os/vitbl.c \
+    src/os/xldtob.c \
+    src/os/xlitob.c \
+    src/os/xprintf.c \
+    src/os/yieldthread.c
+
+# OS/nusys
+NUSYS_SRCS := \
+    src/os/nusys/nuboot.c \
+    src/os/nusys/nucontdataget.c \
+    src/os/nusys/nucontdatalock.c \
+    src/os/nusys/nucontinit.c \
+    src/os/nusys/nucontmgr.c \
+    src/os/nusys/nucontpakmgr.c \
+    src/os/nusys/nucontqueryread.c \
+    src/os/nusys/nucontrmbcheck.c \
+    src/os/nusys/nucontrmbforcestop.c \
+    src/os/nusys/nucontrmbforcestopend.c \
+    src/os/nusys/nucontrmbmgr.c \
+    src/os/nusys/nucontrmbmodeset.c \
+    src/os/nusys/nucontrmbstart.c \
+    src/os/nusys/nugfxdisplayoff.c \
+    src/os/nusys/nugfxdisplayon.c \
+    src/os/nusys/nugfxfuncset.c \
+    src/os/nusys/nugfxinit.c \
+    src/os/nusys/nugfxprenmifuncset.c \
+    src/os/nusys/nugfxretracewait.c \
+    src/os/nusys/nugfxsetcfb.c \
+    src/os/nusys/nugfxswapcfb.c \
+    src/os/nusys/nugfxswapcfbfuncset.c \
+    src/os/nusys/nugfxtaskallendwait.c \
+    src/os/nusys/nugfxtaskmgr.c \
+    src/os/nusys/nugfxthread.c \
+    src/os/nusys/nupiinit.c \
+    src/os/nusys/nupireadrom.c \
+    src/os/nusys/nupireadromoverlay.c \
+    src/os/nusys/nusched.c \
+    src/os/nusys/nusicallbackadd.c \
+    src/os/nusys/nusicallbackremove.c \
+    src/os/nusys/nusimgr.c
 
 # Linux/PC specific
 LINUX_SRCS := $(wildcard src/linux/*.c)
@@ -247,6 +401,7 @@ ALL_SRCS := \
     $(GCC_SRCS) \
     $(PAUSE_SRCS) \
     $(OS_SRCS) \
+    $(NUSYS_SRCS) \
     $(BATTLE_SRCS) \
     $(WORLD_SRCS) \
     $(LINUX_SRCS) \
@@ -281,5 +436,6 @@ info:
 	@echo "World: $(words $(WORLD_SRCS))"
 	@echo "Effects: $(words $(EFFECTS_SRCS))"
 	@echo "OS: $(words $(OS_SRCS))"
+	@echo "Nusys: $(words $(NUSYS_SRCS))"
 	@echo "Linux: $(words $(LINUX_SRCS))"
 	@echo "Generated: $(words $(GENERATED_SRCS))"

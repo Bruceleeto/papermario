@@ -40,10 +40,10 @@ s32 shim_get_msg_width(s32, u16);
 void shim_mdl_get_shroud_tint_params(u8* r, u8* g, u8* b, u8* a);
 void shim_sfx_play_sound_at_position(s32 soundID, s32 value2, f32 posX, f32 posY, f32 posZ);
 
-#define guRotateF shim_guRotateF
 
 #ifndef LINUX
-// N64: effects are overlays, need shims for functions in gu_matrix.c
+// N64: effects are overlays, need shims for functions we have C implementations for
+#define guRotateF shim_guRotateF
 #define guTranslateF shim_guTranslateF
 #define guTranslate shim_guTranslate
 #define guScaleF shim_guScaleF
@@ -51,8 +51,6 @@ void shim_sfx_play_sound_at_position(s32 soundID, s32 value2, f32 posX, f32 posY
 #define guMtxF2L shim_guMtxF2L
 #define guMtxL2F shim_guMtxL2F
 #define guMtxIdentF shim_guMtxIdentF
-#endif
-
 #define queue_render_task shim_queue_render_task
 #define create_effect_instance shim_create_effect_instance
 #define remove_effect shim_remove_effect
@@ -79,5 +77,7 @@ void shim_sfx_play_sound_at_position(s32 soundID, s32 value2, f32 posX, f32 posY
 #define get_msg_width shim_get_msg_width
 #define mdl_get_shroud_tint_params shim_mdl_get_shroud_tint_params
 #define sfx_play_sound_at_position shim_sfx_play_sound_at_position
+#endif
+
 
 #endif
