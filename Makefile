@@ -142,10 +142,13 @@ CORE_SRCS := \
     src/status_icons.c \
     src/status_star_shimmer.c \
     src/texture_memory.c \
-    src/trigger.c \
+	src/trigger.c \
     src/vars_access.c \
     src/windows.c \
-    src/worker.c
+    src/worker.c \
+    src/battle_heap_create_obfuscated.c \
+    src/battle_ui_gfx.c \
+    src/world_use_item.c
 
 # Audio
 AUDIO_SRCS := \
@@ -381,7 +384,6 @@ NUSYS_SRCS := \
     src/os/nusys/nugfxtaskmgr.c \
     src/os/nusys/nugfxthread.c \
     src/os/nusys/nupiinit.c \
-    src/os/nusys/nupireadrom.c \
     src/os/nusys/nupireadromoverlay.c \
     src/os/nusys/nusched.c \
     src/os/nusys/nusicallbackadd.c \

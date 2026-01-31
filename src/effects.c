@@ -13,6 +13,16 @@ EffectInstance* gEffectInstances[96];
 extern TlbMappablePage gEffectDataBuffer;
 extern Addr gEffectGlobals;
 
+#ifdef LINUX
+#define FX_ENTRY(name, gfx_name) { \
+    .entryPoint = name##_main, \
+    .dmaStart = NULL, \
+    .dmaEnd = NULL, \
+    .dmaDest = NULL, \
+    .graphicsDmaStart = NULL, \
+    .graphicsDmaEnd = NULL, \
+}
+#else
 #define FX_ENTRY(name, gfx_name) { \
     .entryPoint = name##_main, \
     .dmaStart = effect_##name##_ROM_START, \
@@ -21,6 +31,7 @@ extern Addr gEffectGlobals;
     .graphicsDmaStart = gfx_name##_ROM_START, \
     .graphicsDmaEnd = gfx_name##_ROM_END, \
 }
+#endif
 
 #include "effects/effect_table.c"
 
@@ -49,9 +60,11 @@ void clear_effect_data(void) {
         gEffectInstances[i] = nullptr;
     }
 
+#ifndef LINUX
     osUnmapTLBAll();
     osMapTLB(EFFECT_GLOBALS_TLB_IDX, OS_PM_4K, effect_globals_VRAM, (s32)&gEffectGlobals & 0xFFFFFF, -1, -1);
     DMA_COPY_SEGMENT(effect_globals);
+#endif
 }
 
 void func_80059D48(void) {
@@ -100,12 +113,16 @@ void update_effects(void) {
                     if (sharedData->freeDelay != 0) {
                         sharedData->freeDelay--;
                     } else {
+#ifndef LINUX
                         if (sharedData->graphics != nullptr) {
                             general_heap_free(sharedData->graphics);
                             sharedData->graphics = nullptr;
                         }
+#endif
                         sharedData->flags = 0;
+#ifndef LINUX
                         osUnmapTLB(i);
+#endif
                     }
                 }
             }
@@ -324,6 +341,10 @@ s32 load_effect(s32 effectIndex) {
     // If no empty space was found, panic
     ASSERT(i < ARRAY_COUNT(gEffectSharedData));
 
+#ifdef LINUX
+    // PC: Effects are statically linked, no DMA needed
+    sharedData->graphics = nullptr;
+#else
     // Map space for the effect
     osMapTLB(i, OS_PM_4K, effectEntry->dmaDest, (s32)(gEffectDataBuffer[i]) & 0xFFFFFF, -1, -1);
 
@@ -371,6 +392,7 @@ s32 load_effect(s32 effectIndex) {
 #endif
             dma_copy(effectEntry->graphicsDmaStart, effectEntry->graphicsDmaEnd, sharedData->graphics);
     }
+#endif
 
     // Initialize the newly loaded effect data
     sharedData->effectIndex = effectIndex;

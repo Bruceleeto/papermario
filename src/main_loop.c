@@ -257,12 +257,14 @@ void gfx_draw_frame(void) {
 void load_engine_data(void) {
     s32 i;
 
+#ifndef LINUX
     DMA_COPY_SEGMENT(engine4);
     DMA_COPY_SEGMENT(engine1);
     DMA_COPY_SEGMENT(evt);
     DMA_COPY_SEGMENT(entity);
     DMA_COPY_SEGMENT(engine2);
     DMA_COPY_SEGMENT(font_width);
+#endif
 
     gOverrideFlags = 0;
     gGameStatusPtr->unk_79 = 0;

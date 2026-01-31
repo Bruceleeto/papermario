@@ -147,12 +147,23 @@ HudScript* SPStarHudScripts[] = { &HES_StatusStar1, &HES_StatusStar3, &HES_Statu
 };
 
 s32 StatusBarSPIncrementOffsets[] = { -1, 1, 2, 4, 5, 7, 8, 0, 0, 0 };
+
+#ifdef LINUX
+UseItemStruct UseItemDmaArgs = {
+    NULL,
+    NULL,
+    &EVS_World_UseItem,
+    0
+};
+#else
 UseItemStruct UseItemDmaArgs = {
     world_use_item_ROM_START,
     world_use_item_ROM_END,
     &EVS_World_UseItem,
     0
 };
+#endif
+
 s32 D_800F8020 = 0;
 s32 wPartnerMoveGoalX = 0;
 s32 wPartnerMoveGoalZ = 0;
@@ -162,14 +173,27 @@ f32 D_800F8034 = 0.0f;
 s16 D_800F8038 = 0;
 s16 D_800F803A = 0;
 
+
+
+#ifdef LINUX
+#define PARTNER_DMA(name) \
+    .dmaStart = NULL, \
+    .dmaEnd = NULL, \
+    .dmaDest = NULL,
+#else
+#define PARTNER_DMA(name) \
+    .dmaStart = &world_partner_##name##_ROM_START, \
+    .dmaEnd = &world_partner_##name##_ROM_END, \
+    .dmaDest = &world_partner_##name##_VRAM,
+#endif
+
+
 WorldPartner wPartners[] = {
     [PARTNER_NONE] {
         // blank
     },
     [PARTNER_GOOMBARIO] {
-        .dmaStart = &world_partner_goombario_ROM_START,
-        .dmaEnd = &world_partner_goombario_ROM_END,
-        .dmaDest = &world_partner_goombario_VRAM,
+        PARTNER_DMA(goombario)
         .isFlying = false,
         .init = world_goombario_init,
         .takeOut = &EVS_WorldGoombario_TakeOut,
@@ -182,9 +206,7 @@ WorldPartner wPartners[] = {
         .preBattle = world_goombario_pre_battle,
     },
     [PARTNER_KOOPER] {
-        .dmaStart = &world_partner_kooper_ROM_START,
-        .dmaEnd = &world_partner_kooper_ROM_END,
-        .dmaDest = &world_partner_kooper_VRAM,
+        PARTNER_DMA(kooper)
         .isFlying = false,
         .init = world_kooper_init,
         .takeOut = &EVS_WorldKooper_TakeOut,
@@ -199,9 +221,7 @@ WorldPartner wPartners[] = {
         .postBattle = world_kooper_post_battle,
     },
     [PARTNER_BOMBETTE] {
-        .dmaStart = &world_partner_bombette_ROM_START,
-        .dmaEnd = &world_partner_bombette_ROM_END,
-        .dmaDest = &world_partner_bombette_VRAM,
+        PARTNER_DMA(bombette)
         .isFlying = false,
         .init = world_bombette_init,
         .takeOut = &EVS_WorldBombette_TakeOut,
@@ -215,9 +235,7 @@ WorldPartner wPartners[] = {
         .preBattle = world_bombette_pre_battle,
     },
     [PARTNER_PARAKARRY] {
-        .dmaStart = &world_partner_parakarry_ROM_START,
-        .dmaEnd = &world_partner_parakarry_ROM_END,
-        .dmaDest = &world_partner_parakarry_VRAM,
+        PARTNER_DMA(parakarry)
         .isFlying = true,
         .init = world_parakarry_init,
         .takeOut = &EVS_WorldParakarry_TakeOut,
@@ -230,9 +248,7 @@ WorldPartner wPartners[] = {
         .postBattle = world_parakarry_post_battle,
     },
     [PARTNER_GOOMPA] {
-        .dmaStart = &world_partner_goompa_ROM_START,
-        .dmaEnd = &world_partner_goompa_ROM_END,
-        .dmaDest = &world_partner_goompa_VRAM,
+        PARTNER_DMA(goompa)
         .isFlying = false,
         .init = world_goompa_init,
         .takeOut = &EVS_WorldGoompa_TakeOut,
@@ -242,9 +258,7 @@ WorldPartner wPartners[] = {
         .idle = ANIM_Goompa_Idle,
     },
     [PARTNER_WATT] {
-        .dmaStart = &world_partner_watt_ROM_START,
-        .dmaEnd = &world_partner_watt_ROM_END,
-        .dmaDest = &world_partner_watt_VRAM,
+        PARTNER_DMA(watt)
         .isFlying = true,
         .init = world_watt_init,
         .takeOut = &EVS_WorldWatt_TakeOut,
@@ -258,9 +272,7 @@ WorldPartner wPartners[] = {
         .onEnterMap = &EVS_WorldWatt_EnterMap,
     },
     [PARTNER_SUSHIE] {
-        .dmaStart = &world_partner_sushie_ROM_START,
-        .dmaEnd = &world_partner_sushie_ROM_END,
-        .dmaDest = &world_partner_sushie_VRAM,
+        PARTNER_DMA(sushie)
         .isFlying = false,
         .init = world_sushie_init,
         .takeOut = &EVS_WorldSushie_TakeOut,
@@ -274,9 +286,7 @@ WorldPartner wPartners[] = {
         .onEnterMap = &EVS_WorldSushie_EnterMap,
     },
     [PARTNER_LAKILESTER] {
-        .dmaStart = &world_partner_lakilester_ROM_START,
-        .dmaEnd = &world_partner_lakilester_ROM_END,
-        .dmaDest = &world_partner_lakilester_VRAM,
+        PARTNER_DMA(lakilester)
         .isFlying = true,
         .init = world_lakilester_init,
         .takeOut = &EVS_WorldLakilester_TakeOut,
@@ -290,9 +300,7 @@ WorldPartner wPartners[] = {
         .onEnterMap = &EVS_WorldLakilester_EnterMap,
     },
     [PARTNER_BOW] {
-        .dmaStart = &world_partner_bow_ROM_START,
-        .dmaEnd = &world_partner_bow_ROM_END,
-        .dmaDest = &world_partner_bow_VRAM,
+        PARTNER_DMA(bow)
         .isFlying = true,
         .init = world_bow_init,
         .takeOut = &EVS_WorldBow_TakeOut,
@@ -305,9 +313,7 @@ WorldPartner wPartners[] = {
         .preBattle = world_bow_pre_battle,
     },
     [PARTNER_GOOMBARIA] {
-        .dmaStart = &world_partner_goombaria_ROM_START,
-        .dmaEnd = &world_partner_goombaria_ROM_END,
-        .dmaDest = &world_partner_goombaria_VRAM,
+        PARTNER_DMA(goombaria)
         .isFlying = false,
         .init = world_goombaria_init,
         .takeOut = &EVS_WorldGoombaria_TakeOut,
@@ -319,9 +325,7 @@ WorldPartner wPartners[] = {
         .canPlayerOpenMenus = partner_is_idle,
     },
     [PARTNER_TWINK] {
-        .dmaStart = &world_partner_twink_ROM_START,
-        .dmaEnd = &world_partner_twink_ROM_END,
-        .dmaDest = &world_partner_twink_VRAM,
+        PARTNER_DMA(twink)
         .isFlying = true,
         .init = world_twink_init,
         .takeOut = &EVS_WorldTwink_TakeOut,
@@ -561,7 +565,9 @@ void create_partner_npc(void) {
 
     *partner = partnerEntry;
     blueprintPtr = &blueprint;
+#ifndef LINUX
     dma_copy(partnerEntry->dmaStart, partnerEntry->dmaEnd, partnerEntry->dmaDest);
+#endif
 
     blueprint.flags = NPC_FLAG_PARTNER | NPC_FLAG_IGNORE_PLAYER_COLLISION;
     blueprint.initialAnim = (*partner)->idle;

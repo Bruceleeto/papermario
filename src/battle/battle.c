@@ -23,6 +23,36 @@ extern Battle* gOverrideBattlePtr;
 extern s32 D_800DC4F8;
 extern Battle* gCurrentBattlePtr;
 
+#ifdef LINUX
+// standard battle area table entry
+#define BTL_AREA(id, jpName) { \
+    .dmaStart = NULL, \
+    .dmaEnd = NULL, \
+    .dmaDest = NULL, \
+    .battles = &b_area_##id##_Formations, \
+    .stages = &b_area_##id##_Stages, \
+    .name = jpName, \
+}
+
+// extended battle area with a dmaTable
+#define BTL_AREA_DMA(id, jpName) { \
+    .dmaStart = NULL, \
+    .dmaEnd = NULL, \
+    .dmaDest = NULL, \
+    .battles = &b_area_##id##_Formations, \
+    .stages = &b_area_##id##_Stages, \
+    .dmaTable = b_area_##id##_dmaTable, \
+    .name = jpName, \
+}
+
+// auxiliary battle area
+#define BTL_AREA_AUX(id, jpName) { \
+    .dmaStart = NULL, \
+    .dmaEnd = NULL, \
+    .dmaDest = NULL, \
+    .name = jpName, \
+}
+#else
 // standard battle area table entry
 #define BTL_AREA(id, jpName) { \
     .dmaStart = battle_area_##id##_ROM_START, \
@@ -31,9 +61,9 @@ extern Battle* gCurrentBattlePtr;
     .battles = &b_area_##id##_Formations, \
     .stages = &b_area_##id##_Stages, \
     .name = jpName, \
-} \
+}
 
-// extended battle area with a dmaTable, used by kzn2 for lava piranha animations
+// extended battle area with a dmaTable
 #define BTL_AREA_DMA(id, jpName) { \
     .dmaStart = battle_area_##id##_ROM_START, \
     .dmaEnd = battle_area_##id##_ROM_END, \
@@ -42,15 +72,16 @@ extern Battle* gCurrentBattlePtr;
     .stages = &b_area_##id##_Stages, \
     .dmaTable = b_area_##id##_dmaTable, \
     .name = jpName, \
-} \
+}
 
-// auxiliary battle area for omo which contains only additional enemy data
+// auxiliary battle area
 #define BTL_AREA_AUX(id, jpName) { \
     .dmaStart = battle_area_##id##_ROM_START, \
     .dmaEnd = battle_area_##id##_ROM_END, \
     .dmaDest = battle_area_##id##_VRAM, \
     .name = jpName, \
-} \
+}
+#endif
 
 BattleArea gBattleAreas[] = {
     [BTL_AREA_KMR_1]    BTL_AREA(kmr_part_1, "エリア ＫＭＲ その１"),
@@ -130,7 +161,9 @@ void load_battle_section(void) {
     BattleArea* battleArea = &gBattleAreas[UNPACK_BTL_AREA(gCurrentBattleID)];
     s32 battleIdx = UNPACK_BTL_INDEX(gCurrentBattleID);
 
+#ifndef LINUX
     dma_copy(battleArea->dmaStart, battleArea->dmaEnd, battleArea->dmaDest);
+#endif
 
     gCurrentBattlePtr = &(*battleArea->battles)[battleIdx];
 

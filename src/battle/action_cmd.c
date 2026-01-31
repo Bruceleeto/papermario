@@ -49,8 +49,14 @@ Difficulty1D actionCmdTableSpook = { 130, 120, 110, 100, 90, 80, 70, 60 };
 Difficulty2D actionCmdTableWaterBlock = { {6, 3}, {5, 3}, {4, 3}, {2, 3}, {1, 3}, {0, 3}, {0, 2}, {0, 1} };
 Difficulty1D actionCmdTableTidalWave = { 130, 120, 110, 100, 90, 80, 70, 60 };
 
+#ifdef LINUX
+#define AC_TBL_ENTRY(name) \
+    NULL, NULL, NULL
+#else
 #define AC_TBL_ENTRY(name) \
     action_cmd_ ## name ## _ROM_START, action_cmd_ ## name ## _ROM_END, action_cmd_ ## name ## _VRAM
+#endif
+
 
 void* actionCommandDmaTable[] = {
     nullptr, nullptr, nullptr,
@@ -91,11 +97,16 @@ BSS s32 D_8029FBD8_pad[2];
 BSS ActionCommandStatus gActionCommandStatus;
 
 API_CALLABLE(LoadActionCommand) {
+#ifdef LINUX
+    // PC: Action commands are statically linked, no DMA needed
+    return ApiStatus_DONE2;
+#else
     Bytecode* args = script->ptrReadPos;
     s32 cmd = evt_get_variable(script, *args++);
 
     dma_copy(actionCommandDmaTable[cmd * 3 + 0], actionCommandDmaTable[cmd * 3 + 1], actionCommandDmaTable[cmd * 3 + 2]);
     return ApiStatus_DONE2;
+#endif
 }
 
 s32 adjust_action_command_difficulty(s32 difficultyLevel) {

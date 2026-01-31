@@ -111,6 +111,23 @@ typedef struct BattleMoveEntry {
     /* 0x0C */ EvtScript* mainScript;
 } BattleMoveEntry; // size = 0x10
 
+#ifdef LINUX
+#define BTL_MOVE(name, script) \
+{ \
+    .romStart   = NULL, \
+    .romEnd     = NULL, \
+    .vramStart  = NULL, \
+    .mainScript = &battle_move_##name##_##script \
+}
+
+#define BTL_ITEM(name) \
+{ \
+    .romStart   = NULL, \
+    .romEnd     = NULL, \
+    .vramStart  = NULL, \
+    .mainScript = &battle_item_##name##_##EVS_UseItem \
+}
+#else
 #define BTL_MOVE(name, script) \
 { \
     .romStart   = battle_move_##name##_ROM_START, \
@@ -126,6 +143,7 @@ typedef struct BattleMoveEntry {
     .vramStart  = name##_VRAM, \
     .mainScript = &battle_item_##name##_##EVS_UseItem \
 }
+#endif
 
 typedef struct ActorBlueprint {
     /* 0x00 */ s32 flags;

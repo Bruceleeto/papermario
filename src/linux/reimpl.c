@@ -126,7 +126,11 @@ void osUnmapTLB(s32 index) {
 
 
 
-
+void nuPiReadRom(u32 rom_addr, void* buf_ptr, u32 size) {
+    // TODO: implement file loading for external assets
+    printf("nuPiReadRom: 0x%08X size 0x%X (not implemented)\n", rom_addr, size);
+    memset(buf_ptr, 0, size);
+}
 
 
 
