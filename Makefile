@@ -14,11 +14,10 @@ CFLAGS := -m32 -g -O0 -Wall -std=gnu89 \
     -Iinclude \
     -Isrc \
     -Iassets/us
-    
+
 BUILD_DIR := build_pc
 TARGET := papermario
 
-# Files that are #included by other .c files (not compiled separately)
 # Files that are #included by other .c files (not compiled separately)
 EXCLUDE_SRCS := \
     %npc_composer.c \
@@ -41,7 +40,6 @@ EXCLUDE_DEAD := \
     src/world/dead/area_flo/flo_25/% \
     src/world/dead/area_kzn/kzn_11/%
 
-# World sources
 # World sources - exclude all dead code
 WORLD_SRCS := $(filter-out %.inc.c $(EXCLUDE_SRCS) src/world/dead/%, $(wildcard src/world/*.c src/world/**/*.c src/world/**/**/*.c src/world/**/**/**/*.c))
 
@@ -177,7 +175,7 @@ CHARSET_SRCS := src/charset/charset.c
 EFFECTS_SRCS := $(filter-out %.inc.c %_de.c %_pal.c %_fr.c %_es.c, $(wildcard src/effects/*.c src/effects/gfx/*.c))
 
 # Entity
-ENTITY_SRCS := $(wildcard src/entity/*.c src/entity/**/*.c src/entity/model/*.c)
+ENTITY_SRCS := $(wildcard src/entity/*.c src/entity/**/*.c)
 
 # EVT scripting
 EVT_SRCS := \
@@ -227,8 +225,14 @@ PAUSE_SRCS := \
     src/pause/pause_styles.c \
     src/pause/pause_tabs.c
 
-# OS/libultra 
+# OS/libultra
 OS_SRCS := $(wildcard src/os/*.c src/os/nusys/*.c)
+
+# Linux/PC specific
+LINUX_SRCS := $(wildcard src/linux/*.c)
+
+# Generated sources
+GENERATED_SRCS := ver/us/build/src/fx_wrappers.c
 
 # All sources
 ALL_SRCS := \
@@ -244,10 +248,14 @@ ALL_SRCS := \
     $(PAUSE_SRCS) \
     $(OS_SRCS) \
     $(BATTLE_SRCS) \
-    $(WORLD_SRCS)
+    $(WORLD_SRCS) \
+    $(LINUX_SRCS) \
+    $(GENERATED_SRCS)
 
-# Objects
-ALL_OBJS := $(patsubst src/%.c,$(BUILD_DIR)/src/%.o,$(ALL_SRCS))
+# Objects - handle both src/ and ver/ paths
+SRC_OBJS := $(patsubst src/%.c,$(BUILD_DIR)/src/%.o,$(filter src/%,$(ALL_SRCS)))
+VER_OBJS := $(patsubst ver/%.c,$(BUILD_DIR)/ver/%.o,$(filter ver/%,$(ALL_SRCS)))
+ALL_OBJS := $(SRC_OBJS) $(VER_OBJS)
 
 .PHONY: all clean
 
@@ -260,6 +268,10 @@ $(BUILD_DIR)/src/%.o: src/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/ver/%.o: ver/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET)
 
@@ -269,3 +281,5 @@ info:
 	@echo "World: $(words $(WORLD_SRCS))"
 	@echo "Effects: $(words $(EFFECTS_SRCS))"
 	@echo "OS: $(words $(OS_SRCS))"
+	@echo "Linux: $(words $(LINUX_SRCS))"
+	@echo "Generated: $(words $(GENERATED_SRCS))"
