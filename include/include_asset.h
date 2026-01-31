@@ -16,7 +16,7 @@
     __asm__( \
         ".globl " #SYMBOLNAME"\n" \
         PUSHSECTION(".data") \
-        ".align 3\n" \
+        ".balign 8\n" \
         ".type " #SYMBOLNAME", @object\n" \
         #SYMBOLNAME":\n" \
         ".incbin \"ver/"ASTRINGIFY(VERSION)"/build/" FILENAME ".bin\"\n" \
@@ -32,7 +32,7 @@
     __asm__( \
         ".globl " #SYMBOLNAME"\n" \
         PUSHSECTION(".data") \
-        ".align 3\n" \
+        ".balign 8\n" \
         ".type " #SYMBOLNAME", @object\n" \
         #SYMBOLNAME":\n" \
         ".incbin \"ver/"ASTRINGIFY(VERSION)"/build/" FILENAME ".bin\"\n" \
@@ -44,7 +44,7 @@
     __asm__( \
         ".globl " #SYMBOLNAME"\n" \
         PUSHSECTION(".data") \
-        ".align 3\n" \
+        ".balign 8\n" \
         ".type " #SYMBOLNAME", @object\n" \
         #SYMBOLNAME":\n" \
         ".incbin \"ver/"ASTRINGIFY(VERSION)"/build/assets/"ASTRINGIFY(VERSION)"/" FILENAME "\"\n" \
