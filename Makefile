@@ -43,6 +43,12 @@ EXCLUDE_DEAD := \
 # World sources - exclude all dead code
 WORLD_SRCS := $(filter-out %.inc.c $(EXCLUDE_SRCS) src/world/dead/%, $(wildcard src/world/*.c src/world/**/*.c src/world/**/**/*.c src/world/**/**/**/*.c))
 
+# Battle sources
+BATTLE_SRCS := $(filter-out %.inc.c, $(wildcard src/battle/*.c src/battle/**/*.c src/battle/**/**/*.c src/battle/**/**/**/*.c src/battle/**/**/**/**/*.c))
+
+# Common sources
+COMMON_SRCS := $(filter-out %.inc.c, $(wildcard src/common/*.c))
+
 # Core sources
 CORE_SRCS := \
     src/101b90_len_8f0.c \
@@ -394,6 +400,7 @@ ALL_SRCS := \
     $(AUDIO_SRCS) \
     $(BSS_SRCS) \
     $(CHARSET_SRCS) \
+    $(COMMON_SRCS) \
     $(EFFECTS_SRCS) \
     $(ENTITY_SRCS) \
     $(EVT_SRCS) \
@@ -412,7 +419,7 @@ SRC_OBJS := $(patsubst src/%.c,$(BUILD_DIR)/src/%.o,$(filter src/%,$(ALL_SRCS)))
 VER_OBJS := $(patsubst ver/%.c,$(BUILD_DIR)/ver/%.o,$(filter ver/%,$(ALL_SRCS)))
 ALL_OBJS := $(SRC_OBJS) $(VER_OBJS)
 
-.PHONY: all clean
+.PHONY: all clean info
 
 all: $(TARGET)
 
@@ -432,9 +439,13 @@ clean:
 
 info:
 	@echo "Total sources: $(words $(ALL_SRCS))"
+	@echo "Core: $(words $(CORE_SRCS))"
+	@echo "Audio: $(words $(AUDIO_SRCS))"
 	@echo "Battle: $(words $(BATTLE_SRCS))"
+	@echo "Common: $(words $(COMMON_SRCS))"
 	@echo "World: $(words $(WORLD_SRCS))"
 	@echo "Effects: $(words $(EFFECTS_SRCS))"
+	@echo "Entity: $(words $(ENTITY_SRCS))"
 	@echo "OS: $(words $(OS_SRCS))"
 	@echo "Nusys: $(words $(NUSYS_SRCS))"
 	@echo "Linux: $(words $(LINUX_SRCS))"

@@ -26,7 +26,7 @@ void guMtxIdent(Mtx *m) {
 }
 
 /**
- * guMtxIdentF - Float identity matrix  
+ * guMtxIdentF - Float identity matrix
  */
 void guMtxIdentF(f32 mf[4][4]) {
     u32 *p = (u32 *)mf;
@@ -55,7 +55,7 @@ void guMtxF2L(f32 mf[4][4], Mtx *m) {
     s32 i;
     u32 *src = (u32 *)mf;
     u32 *dst = (u32 *)m;
-    
+
     for (i = 0; i < 8; i++) {
         s32 e1 = FTOFIX32(((f32 *)src)[i * 2]);
         s32 e2 = FTOFIX32(((f32 *)src)[i * 2 + 1]);
@@ -71,7 +71,7 @@ void guMtxL2F(f32 mf[4][4], Mtx *m) {
     s32 i;
     u32 *src = (u32 *)m;
     f32 *dst = (f32 *)mf;
-    
+
     for (i = 0; i < 8; i++) {
         u32 intPart = src[i];
         u32 fracPart = src[i + 8];
@@ -139,4 +139,14 @@ void guTranslate(Mtx *m, f32 x, f32 y, f32 z) {
     f32 mf[4][4];
     guTranslateF(mf, x, y, z);
     guMtxF2L(mf, m);
+}
+
+void guNormalize(f32* x, f32* y, f32* z) {
+    f32 len = sqrtf((*x * *x) + (*y * *y) + (*z * *z));
+    if (len > 0.0f) {
+        len = 1.0f / len;
+        *x *= len;
+        *y *= len;
+        *z *= len;
+    }
 }
