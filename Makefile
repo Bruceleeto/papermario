@@ -100,7 +100,6 @@ CORE_SRCS := \
     src/input.c \
     src/inspect_icon.c \
     src/inventory.c \
-    src/is_debug.c \
     src/i_spy.c \
     src/item_entity.c \
     src/level_up.c \
@@ -251,7 +250,6 @@ OS_SRCS := \
     src/os/controller.c \
     src/os/coss.c \
     src/os/crc.c \
-    src/os/createmesgqueue.c \
     src/os/createthread.c \
     src/os/destroythread.c \
     src/os/devmgr.c \
@@ -301,10 +299,8 @@ OS_SRCS := \
     src/os/pimgr.c \
     src/os/pirawdma.c \
     src/os/position.c \
-    src/os/recvmesg.c \
     src/os/resetglobalintmask.c \
     src/os/rotateRPY.c \
-    src/os/sendmesg.c \
     src/os/setglobalintmask.c \
     src/os/seteventmesg.c \
     src/os/setthreadpri.c \

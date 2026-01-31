@@ -2,11 +2,103 @@
 #include "common.h"
 #include "effects.h"
 #include <time.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <stdlib.h>
 
 
 // RSP microcode - dummy addresses
 u8 gspF3DZEX2_NoN_PosLight_fifoTextStart[1];
 u8 gspF3DZEX2_NoN_PosLight_fifoDataStart[1];
+
+
+//////////////  I got lazy fix this.
+u32 i_spy_VRAM = 0;
+u32 i_spy_ROM_START = 0;
+u32 i_spy_ROM_END = 0;
+u32 pulse_stone_VRAM = 0;
+u32 pulse_stone_ROM_START = 0;
+u32 pulse_stone_ROM_END = 0;
+u32 speech_bubble_VRAM = 0;
+u32 speech_bubble_ROM_START = 0;
+u32 speech_bubble_ROM_END = 0;
+u32 inspect_icon_VRAM = 0;
+u32 inspect_icon_ROM_START = 0;
+u32 inspect_icon_ROM_END = 0;
+u32 world_action_CLASS_VRAM = 0;
+u32 create_audio_system_obfuscated_VRAM = 0;
+u32 create_audio_system_obfuscated_ROM_START = 0;
+u32 create_audio_system_obfuscated_ROM_END = 0;
+u32 load_engine_data_obfuscated_VRAM = 0;
+u32 load_engine_data_obfuscated_ROM_START = 0;
+u32 load_engine_data_obfuscated_ROM_END = 0;
+u32 general_heap_create_obfuscated_VRAM = 0;
+u32 general_heap_create_obfuscated_ROM_START = 0;
+u32 general_heap_create_obfuscated_ROM_END = 0;
+u32 battle_heap_create_obfuscated_VRAM = 0;
+u32 battle_heap_create_obfuscated_ROM_START = 0;
+u32 battle_heap_create_obfuscated_ROM_END = 0;
+u32 battle_code_VRAM = 0;
+u32 battle_code_ROM_START = 0;
+u32 battle_code_ROM_END = 0;
+u32 logos_ROM_START = 0;
+u32 logos_ROM_END = 0;
+u32 ui_images_filemenu_pause_VRAM = 0;
+u32 ui_images_filemenu_pause_ROM_START = 0;
+u32 ui_images_filemenu_pause_ROM_END = 0;
+u32 btl_states_menus_VRAM = 0;
+u32 btl_states_menus_ROM_START = 0;
+u32 btl_states_menus_ROM_END = 0;
+u32 starpoint_VRAM = 0;
+u32 starpoint_ROM_START = 0;
+u32 starpoint_ROM_END = 0;
+u32 level_up_VRAM = 0;
+u32 level_up_ROM_START = 0;
+u32 level_up_ROM_END = 0;
+u32 dgb_01_smash_bridges_VRAM = 0;
+u32 dgb_01_smash_bridges_ROM_START = 0;
+u32 dgb_01_smash_bridges_ROM_END = 0;
+
+// Asset ROM addresses
+u32 icon_ROM_START = 0;
+u32 msg_ROM_START = 0;
+u32 audio_ROM_START = 0;
+u32 title_bg_1_ROM_START = 0;
+u32 sprite_shading_profiles_ROM_START = 0;
+u32 sprite_shading_profiles_data_ROM_START = 0;
+u32 entity_model_Signpost_ROM_START = 0;
+u32 entity_model_Signpost_ROM_END = 0;
+
+// Battle heap - needs actual memory
+HeapNode heap_battleHead;
+
+/////////////////////////////////////////////////
+
+// imgfx animation headers - ROM offsets, stub to NULL
+u8* shock_header = NULL;
+u8* shiver_header = NULL;
+u8* vertical_pipe_curl_header = NULL;
+u8* horizontal_pipe_curl_header = NULL;
+u8* startle_header = NULL;
+u8* flutter_down_header = NULL;
+u8* unfurl_header = NULL;
+u8* get_in_bed_header = NULL;
+u8* spirit_capture_header = NULL;
+u8* unused_1_header = NULL;
+u8* unused_2_header = NULL;
+u8* unused_3_header = NULL;
+u8* tutankoopa_gather_header = NULL;
+u8* tutankoopa_swirl_2_header = NULL;
+u8* tutankoopa_swirl_1_header = NULL;
+u8* shuffle_cards_header = NULL;
+u8* flip_card_1_header = NULL;
+u8* flip_card_2_header = NULL;
+u8* flip_card_3_header = NULL;
+u8* cymbal_crush_header = NULL;
+
+u32 imgfx_data_ROM_START = 0;
+u32 charset_ROM_START = 0;
+
 
 BackgroundHeader gBackgroundImage;
 
@@ -28,6 +120,72 @@ s32 osTvType = 1;  // NTSC
 s32 osResetType = 0;
 s32 osAppNMIBuffer[64];
 void* osRomBase = NULL;
+
+
+
+void is_debug_init(void) {
+    // No-op on Linux
+}
+
+void osSyncPrintf(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    vprintf(fmt, args);
+    va_end(args);
+}
+
+void rmonPrintf(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    vprintf(fmt, args);
+    va_end(args);
+}
+
+void is_debug_panic(const char* message, char* file, s32 line) {
+    fprintf(stderr, "PANIC - File:%s Line:%d  %s \n", file, line, message);
+    abort();
+}
+
+
+s32 osRecvMesg(OSMesgQueue *mq, OSMesg *msg, s32 flags) {
+    if (MQ_IS_EMPTY(mq)) {
+        if (flags == OS_MESG_NOBLOCK) {
+            return -1;
+        }
+        // Blocking mode but empty - just return -1 for now
+        // Real implementation would need proper sync
+        return -1;
+    }
+
+    if (msg != NULL) {
+        *msg = mq->msg[mq->first];
+    }
+    mq->first = (mq->first + 1) % mq->msgCount;
+    mq->validCount--;
+    return 0;
+}
+
+s32 osSendMesg(OSMesgQueue *mq, OSMesg msg, s32 flags) {
+    if (MQ_IS_FULL(mq)) {
+        if (flags == OS_MESG_NOBLOCK) {
+            return -1;
+        }
+        return -1;
+    }
+
+    mq->msg[(mq->first + mq->validCount) % mq->msgCount] = msg;
+    mq->validCount++;
+    return 0;
+}
+
+void osCreateMesgQueue(OSMesgQueue *mq, OSMesg *msg, s32 count) {
+    mq->mtqueue = NULL;
+    mq->fullqueue = NULL;
+    mq->validCount = 0;
+    mq->first = 0;
+    mq->msgCount = count;
+    mq->msg = msg;
+}
 
 
 void __osSetCompare(u32 value) {
@@ -132,7 +290,7 @@ void osUnmapTLB(s32 index) {
 
 void nuPiReadRom(u32 rom_addr, void* buf_ptr, u32 size) {
     // TODO: implement file loading for external assets
-    printf("nuPiReadRom: 0x%08X size 0x%X (not implemented)\n", rom_addr, size);
+    printf("nuPiReadRom: 0x%08X size 0x%X (currently does fuck all)\n", rom_addr, size);
     memset(buf_ptr, 0, size);
 }
 

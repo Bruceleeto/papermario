@@ -2,6 +2,9 @@
 #include "PR/osint.h"
 
 s32 osAiSetFrequency(u32 frequency) {
+#ifdef LINUX
+    return frequency;
+#else
     unsigned int dacRate;
     unsigned char bitRate;
     float f;
@@ -15,4 +18,5 @@ s32 osAiSetFrequency(u32 frequency) {
     IO_WRITE(AI_DACRATE_REG, dacRate - 1);
     IO_WRITE(AI_BITRATE_REG, bitRate - 1);
     return osViClock / (s32)dacRate;
+#endif
 }
