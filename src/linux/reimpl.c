@@ -1,5 +1,6 @@
 // src/pc/ld_addrs_stub.c
 #include "common.h"
+#include "effects.h"
 #include <time.h>
 
 
@@ -13,7 +14,10 @@ BackgroundHeader gBackgroundImage;
 u8 n_aspMainTextStart[1];
 u8 n_aspMainDataStart[1];
 
-
+// Alias from undefined_syms.txt: fx_sun_undeclared = fx_sun
+void fx_sun_undeclared(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f) {
+    fx_sun(a, b, c, d, e, f);
+}
 // from undefined_sysms.txt
 // gBackgroundImage = 0x80200000;
 // gMapShapeData = 0x80210000;

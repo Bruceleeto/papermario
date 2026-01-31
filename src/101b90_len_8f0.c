@@ -4,7 +4,9 @@
 #include "ld_addrs.h"
 #include "sprite/player.h"
 
-#ifdef SHIFT
+#ifdef LINUX
+#define SPRITE_ROM_START 0
+#elif defined(SHIFT)
 #define SPRITE_ROM_START (u32) sprites_ROM_START + 0x10
 #elif VERSION_US || VERSION_IQUE
 #define SPRITE_ROM_START 0x1943000 + 0x10
@@ -156,6 +158,28 @@ SpriteAnimData* spr_load_sprite(s32 idx, s32 isPlayerSprite, s32 useTailAlloc) {
 }
 
 void spr_init_player_raster_cache(s32 cacheSize, s32 maxRasterSize) {
+#ifdef LINUX
+    // TODO: Load sprites from files
+    s32 i;
+    void* raster;
+
+    PlayerRasterCacheSize = cacheSize;
+    PlayerRasterMaxSize = maxRasterSize;
+    raster = _heap_malloc(&heap_spriteHead, maxRasterSize * cacheSize);
+
+    for (i = 0; i < ARRAY_COUNT(PlayerRasterCache); i++) {
+        PlayerRasterCache[i].raster = raster;
+        raster += PlayerRasterMaxSize;
+        PlayerRasterCache[i].lazyDeleteTime = 0;
+        PlayerRasterCache[i].rasterIndex = 0;
+        PlayerRasterCache[i].spriteIndex = 0xFF;
+    }
+
+    for (i = 0; i < ARRAY_COUNT(PlayerRasterLoadDescBeginSpriteIndex); i++) {
+        PlayerRasterLoadDescBeginSpriteIndex[i] = 0;
+    }
+    PlayerRasterLoadDescNumLoaded = 0;
+#else
     void* raster;
     s32 i;
 
@@ -175,12 +199,13 @@ void spr_init_player_raster_cache(s32 cacheSize, s32 maxRasterSize) {
         PlayerRasterCache[i].spriteIndex = 0xFF;
     }
 
-    for (i = 0; i < ARRAY_COUNT(PlayerRasterLoadDescBeginSpriteIndex); i++)    {
+    for (i = 0; i < ARRAY_COUNT(PlayerRasterLoadDescBeginSpriteIndex); i++) {
         PlayerRasterLoadDescBeginSpriteIndex[i] = 0;
     }
     PlayerRasterLoadDescNumLoaded = 0;
     nuPiReadRom(SpriteDataHeader[0], &PlayerRasterHeader, sizeof(PlayerRasterHeader));
     nuPiReadRom(SpriteDataHeader[0] + PlayerRasterHeader.indexRanges, PlayerSpriteRasterSets, sizeof(PlayerSpriteRasterSets));
+#endif
 }
 
 IMG_PTR spr_get_player_raster(s32 rasterIndex, s32 playerSpriteID) {

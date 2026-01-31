@@ -33,7 +33,9 @@ Vec3f gEntityColliderNormals[] = {
 //TODO data split here!
 s32 pad_map_table[] = { 0, 0 };
 
-#ifdef SHIFT
+#ifdef LINUX
+#define ASSET_TABLE_ROM_START 0x1E40000
+#elif defined(SHIFT)
 #define ASSET_TABLE_ROM_START (s32) mapfs_ROM_START
 #elif VERSION_JP
 #define ASSET_TABLE_ROM_START 0x1E00000

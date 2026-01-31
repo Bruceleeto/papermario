@@ -15,6 +15,19 @@ u16* pause_frameBuffers[] = { gFrameBuf0, gFrameBuf1, gFrameBuf2 };
 
 extern ShapeFile gMapShapeData;
 
+#ifdef LINUX
+NUPiOverlaySegment PauseOverlaySegment = {
+    .romStart = NULL,
+    .romEnd = NULL,
+    .ramStart = NULL,
+    .textStart = NULL,
+    .textEnd = NULL,
+    .dataStart = NULL,
+    .dataEnd = NULL,
+    .bssStart = NULL,
+    .bssEnd = NULL,
+};
+#else
 NUPiOverlaySegment PauseOverlaySegment = {
     .romStart = pause_ROM_START,
     .romEnd = pause_ROM_END,
@@ -26,6 +39,7 @@ NUPiOverlaySegment PauseOverlaySegment = {
     .bssStart = pause_BSS_START,
     .bssEnd = pause_BSS_END,
 };
+#endif
 
 #if VERSION_PAL
 NUPiOverlaySegment PauseGfxOverlaySegment_en = {
@@ -143,7 +157,9 @@ void state_step_pause(void) {
                     SavedReverbMode = sfx_get_reverb_mode();
                     sfx_set_reverb_mode(0);
                     bgm_quiet_max_volume();
+                    #ifndef LINUX
                     nuPiReadRomOverlay(&PauseOverlaySegment);
+                    #endif
 #if VERSION_PAL
                     switch (gCurrentLanguage) {
                         case LANGUAGE_EN:
@@ -245,10 +261,11 @@ void state_step_unpause(void) {
                     initialize_collision();
                     restore_map_collision_data();
 
+                    #ifndef LINUX
                     if (mapConfig->dmaStart != nullptr) {
                         dma_copy(mapConfig->dmaStart, mapConfig->dmaEnd, mapConfig->dmaDest);
                     }
-
+                    #endif
                     load_map_bg(mapConfig->bgName);
                     if (mapSettings->background != nullptr) {
                         set_background(mapSettings->background);
