@@ -143,54 +143,9 @@ extern char __executable_start;  // Linker-provided symbol
 extern char _end;                // End of BSS
 
 void* pc_resolve_addr(u32 addr) {
-    void* result;
-
     if (addr == 0) return NULL;
-
-    /* Calculate offset once using a known symbol */
-    if (!sOffsetCalculated) {
-        u32 pc_addr = (u32)(uintptr_t)&D_80164000;
-        sN64ToPC_Offset = pc_addr - 0x80164000;
-        printf("N64->PC offset: 0x%08X\n", sN64ToPC_Offset);
-        printf("  D_80164000: N64=0x80164000 PC=0x%08X\n", pc_addr);
-        printf("  Valid range: 0x%08X - 0x%08X\n",
-               (u32)(uintptr_t)&__executable_start,
-               (u32)(uintptr_t)&_end);
-        sOffsetCalculated = 1;
-    }
-
-    /* N64 KSEG0 address (0x80000000 - 0x9FFFFFFF) */
-    if (addr >= 0x80000000 && addr < 0xA0000000) {
-        result = (void*)(uintptr_t)(addr + sN64ToPC_Offset);
-
-        /* Validate result is within our binary */
-        if ((uintptr_t)result < (uintptr_t)&__executable_start ||
-            (uintptr_t)result > (uintptr_t)&_end) {
-            /* Outside binary - likely heap data, skip it */
-            return NULL;
-        }
-        return result;
-    }
-
-    /* N64 KSEG1 address */
-    if (addr >= 0xA0000000 && addr < 0xC0000000) {
-        u32 kseg0_addr = addr & 0x9FFFFFFF;
-        return pc_resolve_addr(kseg0_addr);
-    }
-
-    /* Low address - might already be PC pointer */
-    if (addr < 0x80000000) {
-        /* Check if it's in valid range */
-        if (addr >= (u32)(uintptr_t)&__executable_start &&
-            addr <= (u32)(uintptr_t)&_end) {
-            return (void*)(uintptr_t)addr;
-        }
-        return NULL;
-    }
-
-    return NULL;
+    return (void*)(uintptr_t)addr;
 }
-
 void gfx_swap_buffers(void) {
     SDL_GL_SwapWindow(window);
 }
