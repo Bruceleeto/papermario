@@ -105,6 +105,15 @@ void nuGfxTaskMgrInit(void) {
 }
 
 void nuGfxTaskStart(Gfx* gfxList_ptr, u32 gfxListSize, u32 ucode, u32 flag) {
+#ifdef LINUX
+    // Process display list on PC
+    pc_process_displaylist(gfxList_ptr);
+
+    // Still need to swap framebuffers
+    if (flag & NU_SC_SWAPBUFFER) {
+        gfx_swap_buffers();
+    }
+#else
     u32 mask;
 
     nuGfxTask_ptr->list.t.data_ptr = (u64*) gfxList_ptr;
@@ -140,4 +149,5 @@ void nuGfxTaskStart(Gfx* gfxList_ptr, u32 gfxListSize, u32 ucode, u32 flag) {
     osWritebackDCacheAll();
     osSendMesg(&nusched.graphicsRequestMQ, (void*) nuGfxTask_ptr, OS_MESG_BLOCK);
     nuGfxTask_ptr = nuGfxTask_ptr->next;
+#endif
 }

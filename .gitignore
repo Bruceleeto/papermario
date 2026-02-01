@@ -67,3 +67,4 @@ compile_commands.json
 
 /ver/*/asm/data/rsp/*.s
 papermario
+assets_le/

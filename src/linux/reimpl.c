@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
-
+#include "../assets_le/vrom_table.h"
 
 // RSP microcode - dummy addresses
 u8 gspF3DZEX2_NoN_PosLight_fifoTextStart[1];
@@ -289,15 +289,43 @@ void osUnmapTLB(s32 index) {
 
 
 void nuPiReadRom(u32 rom_addr, void* buf_ptr, u32 size) {
-    // TODO: implement file loading for external assets
-    printf("nuPiReadRom: 0x%08X size 0x%X (currently does fuck all)\n", rom_addr, size);
-    memset(buf_ptr, 0, size);
+    const VromEntry* entry;
+    u32 offset;
+    char path[256];
+    FILE* f;
+
+    /* Audio range - not real ROM, skip */
+    if (rom_addr >= 0xB0000000) {
+        memset(buf_ptr, 0, size);
+        return;
+    }
+
+    entry = vrom_find(rom_addr);
+
+    if (!entry) {
+        printf("nuPiReadRom: unknown addr 0x%08X size 0x%X\n", rom_addr, size);
+        memset(buf_ptr, 0, size);
+        return;
+    }
+
+    offset = rom_addr - entry->vrom_start;
+    snprintf(path, sizeof(path), "assets_le/%s", entry->filename);
+
+    f = fopen(path, "rb");
+    if (!f) {
+        printf("nuPiReadRom: can't open %s\n", path);
+        memset(buf_ptr, 0, size);
+        return;
+    }
+
+    fseek(f, offset, SEEK_SET);
+    fread(buf_ptr, 1, size, f);
+    fclose(f);
 }
 
 
 
-
-// Decompression may need to fix up later.
+// Decompression may need to fix up later or no op later..
 void decode_yay0(void* src, void* dst) {
     u8* srcPtr = (u8*)src;
     u8* dstPtr = (u8*)dst;

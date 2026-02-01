@@ -5,7 +5,7 @@
 #include "sprite/player.h"
 
 #ifdef LINUX
-#define SPRITE_ROM_START 0
+#define SPRITE_ROM_START (0x019A3A30 + 0x10)
 #elif defined(SHIFT)
 #define SPRITE_ROM_START (u32) sprites_ROM_START + 0x10
 #elif VERSION_US || VERSION_IQUE
@@ -75,7 +75,7 @@ SpriteAnimData* spr_load_sprite(s32 idx, s32 isPlayerSprite, s32 useTailAlloc) {
     SpriteAnimData* animData;
     s32 base;
     s32 i;
-    s32 compressedSize;
+    s32 size;
     s32* ptr1;
     IMG_PTR image;
     s32 count;
@@ -91,21 +91,39 @@ SpriteAnimData* spr_load_sprite(s32 idx, s32 isPlayerSprite, s32 useTailAlloc) {
     // read current and next sprite offsets, so we can find the difference
     nuPiReadRom(base + idx * 4, &spr_asset_entry, sizeof(spr_asset_entry));
 
-    compressedSize = ALIGN8(spr_asset_entry[1] - spr_asset_entry[0]);
-    data = general_heap_malloc(compressedSize);
-    nuPiReadRom(base + spr_asset_entry[0], data, compressedSize);
-
-    ptr1 = (s32*)data;
-    // skip 4 bytes: 'YAY0' signature
-    ptr1++;
+#ifdef LINUX
+    // Data is already decompressed and LE - size is actual size, not compressed
+    size = ALIGN8(spr_asset_entry[1] - spr_asset_entry[0]);
 
     if (useTailAlloc) {
-        animData = _heap_malloc_tail(&heap_spriteHead, *ptr1);
+        animData = _heap_malloc_tail(&heap_spriteHead, size);
     } else {
-        animData = _heap_malloc(&heap_spriteHead, *ptr1);
+        animData = _heap_malloc(&heap_spriteHead, size);
     }
-    decode_yay0(data, animData);
-    general_heap_free(data);
+
+    // Read directly into animData - no YAY0 decompression needed
+    nuPiReadRom(base + spr_asset_entry[0], animData, size);
+#else
+    {
+        s32 compressedSize;
+
+        compressedSize = ALIGN8(spr_asset_entry[1] - spr_asset_entry[0]);
+        data = general_heap_malloc(compressedSize);
+        nuPiReadRom(base + spr_asset_entry[0], data, compressedSize);
+
+        ptr1 = (s32*)data;
+        // skip 4 bytes: 'YAY0' signature
+        ptr1++;
+
+        if (useTailAlloc) {
+            animData = _heap_malloc_tail(&heap_spriteHead, *ptr1);
+        } else {
+            animData = _heap_malloc(&heap_spriteHead, *ptr1);
+        }
+        decode_yay0(data, animData);
+        general_heap_free(data);
+    }
+#endif
 
     // swizzle raster array
     data = (s32**)animData->rastersOffset;
@@ -158,28 +176,6 @@ SpriteAnimData* spr_load_sprite(s32 idx, s32 isPlayerSprite, s32 useTailAlloc) {
 }
 
 void spr_init_player_raster_cache(s32 cacheSize, s32 maxRasterSize) {
-#ifdef LINUX
-    // TODO: Load sprites from files
-    s32 i;
-    void* raster;
-
-    PlayerRasterCacheSize = cacheSize;
-    PlayerRasterMaxSize = maxRasterSize;
-    raster = _heap_malloc(&heap_spriteHead, maxRasterSize * cacheSize);
-
-    for (i = 0; i < ARRAY_COUNT(PlayerRasterCache); i++) {
-        PlayerRasterCache[i].raster = raster;
-        raster += PlayerRasterMaxSize;
-        PlayerRasterCache[i].lazyDeleteTime = 0;
-        PlayerRasterCache[i].rasterIndex = 0;
-        PlayerRasterCache[i].spriteIndex = 0xFF;
-    }
-
-    for (i = 0; i < ARRAY_COUNT(PlayerRasterLoadDescBeginSpriteIndex); i++) {
-        PlayerRasterLoadDescBeginSpriteIndex[i] = 0;
-    }
-    PlayerRasterLoadDescNumLoaded = 0;
-#else
     void* raster;
     s32 i;
 
@@ -199,13 +195,12 @@ void spr_init_player_raster_cache(s32 cacheSize, s32 maxRasterSize) {
         PlayerRasterCache[i].spriteIndex = 0xFF;
     }
 
-    for (i = 0; i < ARRAY_COUNT(PlayerRasterLoadDescBeginSpriteIndex); i++) {
+    for (i = 0; i < ARRAY_COUNT(PlayerRasterLoadDescBeginSpriteIndex); i++)    {
         PlayerRasterLoadDescBeginSpriteIndex[i] = 0;
     }
     PlayerRasterLoadDescNumLoaded = 0;
     nuPiReadRom(SpriteDataHeader[0], &PlayerRasterHeader, sizeof(PlayerRasterHeader));
     nuPiReadRom(SpriteDataHeader[0] + PlayerRasterHeader.indexRanges, PlayerSpriteRasterSets, sizeof(PlayerSpriteRasterSets));
-#endif
 }
 
 IMG_PTR spr_get_player_raster(s32 rasterIndex, s32 playerSpriteID) {

@@ -45,7 +45,12 @@ extern IMG_BIN ResetTilesImg[];
 u16* ResetFrameBufferArray;
 u16* nuGfxZBuffer;
 
+#ifdef LINUX
+void linux_main_loop(void);
+#endif
+
 void boot_main(void* data) {
+#ifndef LINUX
 #if VERSION_JP
     if (osTvType == OS_TV_NTSC) {
         nuGfxDisplayOff();
@@ -79,26 +84,42 @@ void boot_main(void* data) {
     nuGfxDisplayOff();
     crash_screen_init();
 #endif
+#endif /* !LINUX */
 
-#if !VERSION_IQUE && !VERSION_PAL
+#if !VERSION_IQUE && !VERSION_PAL && !defined(LINUX)
     is_debug_init();
 #endif
+
+#ifndef LINUX
     nuGfxInit();
     gGameStatusPtr->contBitPattern = nuContInit();
+#endif
 
-#if !VERSION_IQUE
+#if !VERSION_IQUE && !defined(LINUX)
     load_obfuscation_shims();
 #endif
+
+#ifndef LINUX
     shim_create_audio_system_obfuscated();
+#endif
     shim_load_engine_data_obfuscated();
 
+#ifndef LINUX
     nuGfxFuncSet((NUGfxFunc) gfxRetrace_Callback);
     nuGfxPreNMIFuncSet(gfxPreNMI_Callback);
+#endif
     gRandSeed += osGetCount();
+#ifndef LINUX
     nuGfxDisplayOn();
+#endif
 
+#ifdef LINUX
+    linux_main_loop();
+#else
     while (true) {}
+#endif
 }
+
 
 void gfxRetrace_Callback(s32 gfxTaskNum) {
     if (ResetGameState != RESET_STATE_NONE) {

@@ -307,9 +307,11 @@ void load_engine_data(void) {
     clear_effect_data();
     clear_saved_variables();
     clear_item_entity_data();
+#ifndef LINUX
     bgm_reset_sequence_players();
     reset_ambient_sounds();
     sfx_clear_sounds();
+#endif
     clear_windows();
     initialize_curtains();
     poll_rumble();
