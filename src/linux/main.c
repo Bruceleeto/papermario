@@ -572,7 +572,7 @@ void pc_process_displaylist(Gfx* dl) {
 
     walk_dl(dl, 0);
 
-    SDL_GL_SwapWindow(window);
+    //SDL_GL_SwapWindow(window);
 }
 
 void linux_main_loop(void) {
@@ -593,7 +593,7 @@ void linux_main_loop(void) {
         }
 
         gfxRetrace_Callback(0);
-        SDL_Delay(50);
+        SDL_Delay(33);
     }
 }
 
