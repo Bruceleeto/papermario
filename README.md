@@ -43,8 +43,10 @@ Note.
 
 * ./install_compilers.sh
 
-* ./configure --non-matching --shift 
- 
+* ./configure --non-matching --shift
+
 * ninja
- 
+
+* python3 pc_assets.py
+
 * make
