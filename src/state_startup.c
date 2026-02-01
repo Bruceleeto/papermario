@@ -59,11 +59,15 @@ void state_step_startup(void) {
     clear_item_entity_data();
     clear_saved_variables();
     initialize_collision();
+#ifndef LINUX
     bgm_init_music_players();
+#endif
     clear_windows();
     partner_initialize_data();
+#ifndef LINUX
     sfx_clear_sounds();
     bgm_reset_volume();
+#endif
     initialize_curtains();
 
     for (i = 0; i < ARRAY_COUNT(gGameStatusPtr->holdRepeatInterval); i++) {
@@ -73,6 +77,7 @@ void state_step_startup(void) {
 
     fio_load_globals();
 
+#ifndef LINUX
     if (gSaveGlobals.useMonoSound == 0) {
         gGameStatusPtr->soundOutputMode = SOUND_OUT_STEREO;
         snd_set_stereo();
@@ -80,6 +85,9 @@ void state_step_startup(void) {
         gGameStatusPtr->soundOutputMode = SOUND_OUT_MONO;
         snd_set_mono();
     }
+#else
+    gGameStatusPtr->soundOutputMode = SOUND_OUT_STEREO;
+#endif
 
 #if VERSION_PAL
     if (gSaveGlobals.language >= 4) {

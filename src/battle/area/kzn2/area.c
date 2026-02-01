@@ -44,11 +44,15 @@ StageList A(Stages) = {
     {},
 };
 
+#ifdef LINUX
+#define PIRANHA_DMA_ENTRY(name) \
+    { NULL, NULL, NULL }
+#else
 #define PIRANHA_DMA_ENTRY(name) \
     { world_model_anim_kzn_##name##_ROM_START,\
       world_model_anim_kzn_##name##_ROM_END,\
       world_model_anim_kzn_##name##_VRAM }
-
+#endif
 DmaTable A(dmaTable)[] = {
     [VINE_ANIM_BOSS_IDLE]                   PIRANHA_DMA_ENTRY(00),
     [VINE_ANIM_BOSS_TWITCH]                 PIRANHA_DMA_ENTRY(01),

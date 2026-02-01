@@ -4,7 +4,9 @@
 #include "ld_addrs.h"
 #include "sprite/player.h"
 
-#ifdef SHIFT
+#ifdef LINUX
+#define SPRITE_ROM_START (0x019A3A30 + 0x10)
+#elif defined(SHIFT)
 #define SPRITE_ROM_START (u32) sprites_ROM_START + 0x10
 #elif VERSION_US || VERSION_IQUE
 #define SPRITE_ROM_START 0x1943000 + 0x10
@@ -73,7 +75,7 @@ SpriteAnimData* spr_load_sprite(s32 idx, s32 isPlayerSprite, s32 useTailAlloc) {
     SpriteAnimData* animData;
     s32 base;
     s32 i;
-    s32 compressedSize;
+    s32 size;
     s32* ptr1;
     IMG_PTR image;
     s32 count;
@@ -89,21 +91,39 @@ SpriteAnimData* spr_load_sprite(s32 idx, s32 isPlayerSprite, s32 useTailAlloc) {
     // read current and next sprite offsets, so we can find the difference
     nuPiReadRom(base + idx * 4, &spr_asset_entry, sizeof(spr_asset_entry));
 
-    compressedSize = ALIGN8(spr_asset_entry[1] - spr_asset_entry[0]);
-    data = general_heap_malloc(compressedSize);
-    nuPiReadRom(base + spr_asset_entry[0], data, compressedSize);
-
-    ptr1 = (s32*)data;
-    // skip 4 bytes: 'YAY0' signature
-    ptr1++;
+#ifdef LINUX
+    // Data is already decompressed and LE - size is actual size, not compressed
+    size = ALIGN8(spr_asset_entry[1] - spr_asset_entry[0]);
 
     if (useTailAlloc) {
-        animData = _heap_malloc_tail(&heap_spriteHead, *ptr1);
+        animData = _heap_malloc_tail(&heap_spriteHead, size);
     } else {
-        animData = _heap_malloc(&heap_spriteHead, *ptr1);
+        animData = _heap_malloc(&heap_spriteHead, size);
     }
-    decode_yay0(data, animData);
-    general_heap_free(data);
+
+    // Read directly into animData - no YAY0 decompression needed
+    nuPiReadRom(base + spr_asset_entry[0], animData, size);
+#else
+    {
+        s32 compressedSize;
+
+        compressedSize = ALIGN8(spr_asset_entry[1] - spr_asset_entry[0]);
+        data = general_heap_malloc(compressedSize);
+        nuPiReadRom(base + spr_asset_entry[0], data, compressedSize);
+
+        ptr1 = (s32*)data;
+        // skip 4 bytes: 'YAY0' signature
+        ptr1++;
+
+        if (useTailAlloc) {
+            animData = _heap_malloc_tail(&heap_spriteHead, *ptr1);
+        } else {
+            animData = _heap_malloc(&heap_spriteHead, *ptr1);
+        }
+        decode_yay0(data, animData);
+        general_heap_free(data);
+    }
+#endif
 
     // swizzle raster array
     data = (s32**)animData->rastersOffset;

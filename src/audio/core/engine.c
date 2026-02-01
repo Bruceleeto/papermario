@@ -34,6 +34,10 @@ void au_release_voice(u8 index) {
 }
 
 void au_engine_init(s32 outputRate) {
+#ifdef LINUX
+    // Audio engine not implemented yet
+    return;
+#else
     AuGlobals* globals;
     ALHeap* alHeap;
     SBNFileEntry fileEntry;
@@ -155,6 +159,7 @@ void au_engine_init(s32 outputRate) {
 
     au_init_delay_channel(0);
     snd_notify_engine_ready(alHeap);
+#endif
 }
 
 /// used to initialize the default Instrument

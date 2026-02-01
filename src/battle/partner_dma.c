@@ -14,6 +14,16 @@ extern ActorBlueprint battle_partner_lakilester;
 extern ActorBlueprint battle_partner_bow;
 extern ActorBlueprint battle_partner_twink;
 
+#ifdef LINUX
+#define BATTLE_PARTNER_ENTRY(name, Y) \
+    { \
+        (u32)NULL, \
+        (u32)NULL, \
+        NULL, \
+        &battle_partner_##name, \
+        Y \
+    }
+#else
 #define BATTLE_PARTNER_ENTRY(name, Y) \
     { \
         (u32)battle_partner_##name##_ROM_START, \
@@ -22,6 +32,7 @@ extern ActorBlueprint battle_partner_twink;
         &battle_partner_##name, \
         Y \
     }
+#endif
 
 PartnerDMAData bPartnerDmaTable[] = {
     {},

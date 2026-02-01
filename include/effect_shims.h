@@ -7,6 +7,8 @@ void shim_guTranslate(Mtx *m, float x, float y, float z);
 void shim_guScaleF(float mf[4][4], float x, float y, float z);
 void shim_guMtxCatF(float m[4][4], float n[4][4], float r[4][4]);
 void shim_guMtxF2L(float mf[4][4], Mtx *m);
+void shim_guMtxL2F(float mf[4][4], Mtx *m);
+void shim_guMtxIdentF(float mf[4][4]);
 RenderTask* shim_queue_render_task(RenderTask* task);
 EffectInstance* shim_create_effect_instance(EffectBlueprint* effectBp);
 void shim_remove_effect(EffectInstance*);
@@ -38,12 +40,17 @@ s32 shim_get_msg_width(s32, u16);
 void shim_mdl_get_shroud_tint_params(u8* r, u8* g, u8* b, u8* a);
 void shim_sfx_play_sound_at_position(s32 soundID, s32 value2, f32 posX, f32 posY, f32 posZ);
 
+
+#ifndef LINUX
+// N64: effects are overlays, need shims for functions we have C implementations for
 #define guRotateF shim_guRotateF
 #define guTranslateF shim_guTranslateF
 #define guTranslate shim_guTranslate
 #define guScaleF shim_guScaleF
 #define guMtxCatF shim_guMtxCatF
 #define guMtxF2L shim_guMtxF2L
+#define guMtxL2F shim_guMtxL2F
+#define guMtxIdentF shim_guMtxIdentF
 #define queue_render_task shim_queue_render_task
 #define create_effect_instance shim_create_effect_instance
 #define remove_effect shim_remove_effect
@@ -70,5 +77,7 @@ void shim_sfx_play_sound_at_position(s32 soundID, s32 value2, f32 posX, f32 posY
 #define get_msg_width shim_get_msg_width
 #define mdl_get_shroud_tint_params shim_mdl_get_shroud_tint_params
 #define sfx_play_sound_at_position shim_sfx_play_sound_at_position
+#endif
+
 
 #endif

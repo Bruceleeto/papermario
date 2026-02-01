@@ -6,6 +6,7 @@ extern u32 __osBbLastVCount;
 extern u32 __osBbVCountWraps;
 
 void __osSetCompare(u32 v) {
+#ifndef LINUX
     if (v != 0) {
         u32 mask = __osDisableInt();
         u32 wraps = (v < __osBbLastVCount) ? __osBbVCountWraps + 1 : __osBbVCountWraps;
@@ -15,4 +16,5 @@ void __osSetCompare(u32 v) {
         __osRestoreInt(mask);
     }
     __asm__ ("mtc0 %0, $11" :: "r"(v));
+#endif
 }

@@ -764,6 +764,7 @@ void entity_reset_collision(Entity* entity) {
 }
 
 void load_area_specific_entity_data(void) {
+#ifndef LINUX
     if (!isAreaSpecificEntityDataLoaded) {
         if (gGameStatusPtr->areaID == AREA_JAN || gGameStatusPtr->areaID == AREA_IWA) {
             DMA_COPY_SEGMENT(entity_jan_iwa);
@@ -775,6 +776,7 @@ void load_area_specific_entity_data(void) {
 
         isAreaSpecificEntityDataLoaded = true;
     }
+#endif
 }
 
 void clear_entity_data(bool arg0) {

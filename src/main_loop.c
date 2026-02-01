@@ -90,9 +90,11 @@ void step_game_loop(void) {
     step_game_mode();
     update_entities();
     func_80138198();
+#ifndef LINUX
     bgm_update_music_control();
     update_ambient_sounds();
     sfx_update_env_sound_params();
+#endif
     update_windows();
     update_curtains();
 
@@ -257,12 +259,14 @@ void gfx_draw_frame(void) {
 void load_engine_data(void) {
     s32 i;
 
+#ifndef LINUX
     DMA_COPY_SEGMENT(engine4);
     DMA_COPY_SEGMENT(engine1);
     DMA_COPY_SEGMENT(evt);
     DMA_COPY_SEGMENT(entity);
     DMA_COPY_SEGMENT(engine2);
     DMA_COPY_SEGMENT(font_width);
+#endif
 
     gOverrideFlags = 0;
     gGameStatusPtr->unk_79 = 0;
@@ -305,9 +309,11 @@ void load_engine_data(void) {
     clear_effect_data();
     clear_saved_variables();
     clear_item_entity_data();
+#ifndef LINUX
     bgm_reset_sequence_players();
     reset_ambient_sounds();
     sfx_clear_sounds();
+#endif
     clear_windows();
     initialize_curtains();
     poll_rumble();

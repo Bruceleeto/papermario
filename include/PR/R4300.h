@@ -60,13 +60,24 @@
 
 #else /* _LANGUAGE_C */
 
-#define	K0_TO_K1(x)	((u32)(x)|0xA0000000)	/* kseg0 to kseg1 */
-#define	K1_TO_K0(x)	((u32)(x)&0x9FFFFFFF)	/* kseg1 to kseg0 */
-#define	K0_TO_PHYS(x)	((u32)(x)&0x1FFFFFFF)	/* kseg0 to physical */
-#define	K1_TO_PHYS(x)	((u32)(x)&0x1FFFFFFF)	/* kseg1 to physical */
-#define	KDM_TO_PHYS(x)	((u32)(x)&0x1FFFFFFF)	/* direct mapped to physical */
-#define	PHYS_TO_K0(x)	((u32)(x)|0x80000000)	/* physical to kseg0 */
-#define	PHYS_TO_K1(x)	((u32)(x)|0xA0000000)	/* physical to kseg1 */
+
+#ifdef LINUX
+#define K0_TO_K1(x)     ((u32)(x))
+#define K1_TO_K0(x)     ((u32)(x))
+#define K0_TO_PHYS(x)   ((u32)(x))
+#define K1_TO_PHYS(x)   ((u32)(x))
+#define KDM_TO_PHYS(x)  ((u32)(x))
+#define PHYS_TO_K0(x)   ((u32)(x))
+#define PHYS_TO_K1(x)   ((u32)(x))
+#else
+#define	K0_TO_K1(x)	((u32)(x)|0xA0000000)
+#define	K1_TO_K0(x)	((u32)(x)&0x9FFFFFFF)
+#define	K0_TO_PHYS(x)	((u32)(x)&0x1FFFFFFF)
+#define	K1_TO_PHYS(x)	((u32)(x)&0x1FFFFFFF)
+#define	KDM_TO_PHYS(x)	((u32)(x)&0x1FFFFFFF)
+#define	PHYS_TO_K0(x)	((u32)(x)|0x80000000)
+#define	PHYS_TO_K1(x)	((u32)(x)|0xA0000000)
+#endif
 
 #endif	/* _LANGUAGE_ASSEMBLY */
 

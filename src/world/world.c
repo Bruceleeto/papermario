@@ -33,7 +33,9 @@ Vec3f gEntityColliderNormals[] = {
 //TODO data split here!
 s32 pad_map_table[] = { 0, 0 };
 
-#ifdef SHIFT
+#ifdef LINUX
+#define ASSET_TABLE_ROM_START 0x1E40000
+#elif defined(SHIFT)
 #define ASSET_TABLE_ROM_START (s32) mapfs_ROM_START
 #elif VERSION_JP
 #define ASSET_TABLE_ROM_START 0x1E00000
@@ -76,9 +78,10 @@ void load_map_hit_asset(void);
 extern ShapeFile gMapShapeData;
 
 void load_map_script_lib(void) {
+#ifndef LINUX
     DMA_COPY_SEGMENT(world_script_api);
+#endif
 }
-
 void load_map_by_IDs(s16 areaID, s16 mapID, s16 loadType) {
     s32 skipLoadingAssets = 0;
     MapConfig* mapConfig;
@@ -135,8 +138,10 @@ void load_map_by_IDs(s16 areaID, s16 mapID, s16 loadType) {
     load_map_script_lib();
 
     if (mapConfig->dmaStart != nullptr) {
-        dma_copy(mapConfig->dmaStart, mapConfig->dmaEnd, mapConfig->dmaDest);
-    }
+    #ifndef LINUX
+            dma_copy(mapConfig->dmaStart, mapConfig->dmaEnd, mapConfig->dmaDest);
+    #endif
+        }
 
     gMapSettings = *mapConfig->settings;
 
@@ -307,16 +312,29 @@ s32 get_asset_offset(char* assetName, s32* compressedSize) {
 
 #define AREA(area, jp_name) { ARRAY_COUNT(area##_maps), area##_maps, "area_" #area, jp_name }
 
+#ifdef LINUX
+#define MAP(map) \
+    .id = #map, \
+    .settings = &map##_settings, \
+    .dmaStart = NULL, \
+    .dmaEnd = NULL, \
+    .dmaDest = NULL
+
+#define MAP_WITH_INIT(map) \
+    MAP(map), \
+    .init = &map##_map_init
+#else
 #define MAP(map) \
     .id = #map, \
     .settings = &map##_settings, \
     .dmaStart = map##_ROM_START, \
     .dmaEnd = map##_ROM_END, \
-    .dmaDest = map##_VRAM \
+    .dmaDest = map##_VRAM
 
 #define MAP_WITH_INIT(map) \
     MAP(map), \
-    .init = &map##_map_init \
+    .init = &map##_map_init
+#endif
 
 /// Toad Town
 #include "area_mac/mac.h"

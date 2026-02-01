@@ -27,6 +27,19 @@ extern u16 gFrameBuf1[];
 extern u16 gFrameBuf2[];
 u16* fsFrameBuffers[] = { gFrameBuf0, gFrameBuf1, gFrameBuf2 };
 
+#ifdef LINUX
+NUPiOverlaySegment D_8007798C = {
+    .romStart = NULL,
+    .romEnd = NULL,
+    .ramStart = NULL,
+    .textStart = NULL,
+    .textEnd = NULL,
+    .dataStart = NULL,
+    .dataEnd = NULL,
+    .bssStart = NULL,
+    .bssEnd = NULL,
+};
+#else
 NUPiOverlaySegment D_8007798C = {
     .romStart = filemenu_ROM_START,
     .romEnd = filemenu_ROM_END,
@@ -38,6 +51,7 @@ NUPiOverlaySegment D_8007798C = {
     .bssStart = filemenu_BSS_START,
     .bssEnd = filemenu_BSS_END,
 };
+#endif
 
 u8 IntroMessageIdx = 0;
 
@@ -141,7 +155,9 @@ void state_step_language_select(void) {
                 if (D_800A0930 == 0) {
                     D_800A0930 = -1;
                     battle_heap_create();
+                    #ifndef LINUX
                     nuPiReadRomOverlay(&D_8007798C);
+                    #endif
                     filemenu_init(2);
                 }
                 if (D_800A0930 >= 0) {
@@ -220,7 +236,9 @@ void state_step_language_select(void) {
                     clear_npcs();
                     clear_entity_data(false);
                     clear_trigger_data();
+                    #ifndef LINUX
                     nuPiReadRomOverlay(&D_8007798C);
+                    #endif
                     filemenu_init(1);
                     gOverrideFlags &= ~GLOBAL_OVERRIDES_DISABLE_DRAW_FRAME;
                     set_screen_overlay_params_front(OVERLAY_NONE, 255.0f);
@@ -260,7 +278,9 @@ void state_step_file_select(void) {
                 if (temp == 0) {
                     D_800A0930 = -1;
                     battle_heap_create();
+                    #ifndef LINUX
                     nuPiReadRomOverlay(&D_8007798C);
+                    #endif
                     filemenu_init(0);
                 }
             }
