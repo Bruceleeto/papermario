@@ -13,7 +13,8 @@ CFLAGS := -m32 -g -O0 -Wall -std=gnu89 \
     -Iver/us/build/include \
     -Iinclude \
     -Isrc \
-    -Iassets/us
+    -Iassets/us \
+    -I/usr/include/SDL2
 
 BUILD_DIR := build_pc
 TARGET := papermario
@@ -141,7 +142,7 @@ CORE_SRCS := \
     src/status_icons.c \
     src/status_star_shimmer.c \
     src/texture_memory.c \
-	src/trigger.c \
+    src/trigger.c \
     src/vars_access.c \
     src/windows.c \
     src/worker.c \
@@ -320,7 +321,6 @@ OS_SRCS := \
     src/os/sptask.c \
     src/os/sptaskyield.c \
     src/os/sptaskyielded.c \
-    src/os/sqrtf.c \
     src/os/startthread.c \
     src/os/stopthread.c \
     src/os/strcmp.c \
@@ -422,7 +422,7 @@ ALL_OBJS := $(SRC_OBJS) $(VER_OBJS)
 all: $(TARGET)
 
 $(TARGET): $(ALL_OBJS)
-	$(CC) -m32 $(ALL_OBJS) -o $@ -lm
+	$(CC) -m32 $(ALL_OBJS) -o $@ -lSDL2 -lGL -lm
 
 $(BUILD_DIR)/src/%.o: src/%.c
 	@mkdir -p $(dir $@)
