@@ -90,9 +90,11 @@ void step_game_loop(void) {
     step_game_mode();
     update_entities();
     func_80138198();
+#ifndef LINUX
     bgm_update_music_control();
     update_ambient_sounds();
     sfx_update_env_sound_params();
+#endif
     update_windows();
     update_curtains();
 
