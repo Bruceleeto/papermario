@@ -1,4 +1,5 @@
 // src/linux/main.c
+#include <common.h>
 #include <SDL.h>
 #include <SDL_opengl.h>
 #include <GL/gl.h>
@@ -7,93 +8,7 @@
 #include <string.h>
 #include <stdint.h>
 
-// Types
-typedef int8_t s8;
-typedef int16_t s16;
-typedef int32_t s32;
-typedef uint8_t u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
-typedef float f32;
 
-// GBI defines
-#define G_VTX               0x01
-#define G_TRI1              0x05
-#define G_TRI2              0x06
-#define G_QUAD              0x07
-#define G_DL                0xDE
-#define G_ENDDL             0xDF
-#define G_MTX               0xDA
-#define G_POPMTX            0xD8
-#define G_TEXTURE           0xD7
-#define G_SETTIMG           0xFD
-#define G_LOADTLUT          0xF0
-#define G_SETTILESIZE       0xF2
-#define G_LOADBLOCK         0xF3
-#define G_SETTILE           0xF5
-#define G_SETPRIMCOLOR      0xFA
-#define G_SETENVCOLOR       0xFB
-#define G_SETFILLCOLOR      0xF7
-#define G_FILLRECT          0xF6
-#define G_MOVEWORD          0xDB
-#define G_SETCOMBINE        0xFC
-#define G_SETOTHERMODE_L    0xE3
-#define G_SETOTHERMODE_H    0xE2
-#define G_TEXRECT           0xE4
-#define G_RDPHALF_1         0xF1
-#define G_RDPHALF_2         0xE1
-#define G_SETSCISSOR        0xED
-#define G_RDPPIPESYNC       0xE7
-#define G_RDPFULLSYNC       0xE9
-#define G_RDPLOADSYNC       0xE6
-#define G_RDPTILESYNC       0xE8
-#define G_SETZIMG           0xFE
-#define G_SETCIMG           0xFF
-#define G_NOOP              0x00
-#define G_GEOMETRYMODE      0xD9
-#define G_MOVEMEM           0xDC
-
-#define G_MTX_PROJECTION    0x04
-#define G_MTX_LOAD          0x02
-#define G_MW_SEGMENT        0x06
-
-#define G_IM_FMT_RGBA       0
-#define G_IM_FMT_CI         2
-#define G_IM_FMT_IA         3
-#define G_IM_FMT_I          4
-#define G_IM_SIZ_4b         0
-#define G_IM_SIZ_8b         1
-#define G_IM_SIZ_16b        2
-#define G_IM_SIZ_32b        3
-
-// Structures
-typedef struct {
-    u32 w0, w1;
-} GfxWords;
-
-typedef union {
-    GfxWords words;
-    u64 force_align;
-} Gfx;
-
-typedef struct {
-    s16 ob[3];
-    u16 flag;
-    s16 tc[2];
-    u8 cn[4];
-} Vtx_t;
-
-typedef union {
-    Vtx_t v;
-} Vtx;
-
-typedef struct {
-    s32 m[4][4];
-} Mtx;
-
-// External - known symbol for address calculation
-extern char D_80164000;
 void boot_main(void* data);
 void gfxRetrace_Callback(s32 gfxTaskNum);
 
