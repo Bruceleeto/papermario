@@ -7,7 +7,7 @@
 #include "sprite.h"
 #include "model.h"
 #include "gcc/string.h"
-
+#include <stdio.h>
 s32 WorldReverbModeMapping[] = { 0, 1, 2, 3 };
 
 //TODO possible data split here
@@ -82,6 +82,7 @@ void load_map_script_lib(void) {
     DMA_COPY_SEGMENT(world_script_api);
 #endif
 }
+
 void load_map_by_IDs(s16 areaID, s16 mapID, s16 loadType) {
     s32 skipLoadingAssets = 0;
     MapConfig* mapConfig;
@@ -138,10 +139,10 @@ void load_map_by_IDs(s16 areaID, s16 mapID, s16 loadType) {
     load_map_script_lib();
 
     if (mapConfig->dmaStart != nullptr) {
-    #ifndef LINUX
-            dma_copy(mapConfig->dmaStart, mapConfig->dmaEnd, mapConfig->dmaDest);
-    #endif
-        }
+#ifndef LINUX
+        dma_copy(mapConfig->dmaStart, mapConfig->dmaEnd, mapConfig->dmaDest);
+#endif
+    }
 
     gMapSettings = *mapConfig->settings;
 
@@ -154,7 +155,11 @@ void load_map_by_IDs(s16 areaID, s16 mapID, s16 loadType) {
         ShapeFile* shapeFile = &gMapShapeData;
         void* yay0Asset = load_asset_by_name(wMapShapeName, &decompressedSize);
 
+#ifdef LINUX
+        memcpy(shapeFile, yay0Asset, decompressedSize);
+#else
         decode_yay0(yay0Asset, shapeFile);
+#endif
         general_heap_free(yay0Asset);
 
         mapSettings->modelTreeRoot = shapeFile->header.root;
@@ -271,6 +276,28 @@ s32 get_map_IDs_by_name(const char* mapName, s16* areaID, s16* mapID) {
 }
 
 void* load_asset_by_name(const char* assetName, u32* decompressedSize) {
+#ifdef LINUX
+    char path[256];
+    FILE* f;
+    long size;
+    void* ret;
+
+    snprintf(path, sizeof(path), "assets_le/maps/%s.bin", assetName);
+    f = fopen(path, "rb");
+    if (!f) {
+        printf("load_asset_by_name: can't open %s\n", path);
+        *decompressedSize = 0;
+        return general_heap_malloc(16);
+    }
+    fseek(f, 0, SEEK_END);
+    size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    ret = general_heap_malloc(size);
+    fread(ret, 1, size, f);
+    fclose(f);
+    *decompressedSize = size;
+    return ret;
+#else
     AssetHeader firstHeader;
     AssetHeader* assetTableBuffer;
     AssetHeader* curAsset;
@@ -289,9 +316,27 @@ void* load_asset_by_name(const char* assetName, u32* decompressedSize) {
              (u8*) ASSET_TABLE_FIRST_ENTRY + curAsset->offset + curAsset->compressedLength, ret);
     heap_free(assetTableBuffer);
     return ret;
+#endif
 }
 
 s32 get_asset_offset(char* assetName, s32* compressedSize) {
+#ifdef LINUX
+    char path[256];
+    FILE* f;
+    long size;
+
+    snprintf(path, sizeof(path), "assets_le/maps/%s.bin", assetName);
+    f = fopen(path, "rb");
+    if (!f) {
+        *compressedSize = 0;
+        return 0;
+    }
+    fseek(f, 0, SEEK_END);
+    size = ftell(f);
+    fclose(f);
+    *compressedSize = size;
+    return 0;
+#else
     AssetHeader firstHeader;
     AssetHeader* assetTableBuffer;
     AssetHeader* curAsset;
@@ -308,6 +353,7 @@ s32 get_asset_offset(char* assetName, s32* compressedSize) {
     ret = ASSET_TABLE_FIRST_ENTRY + curAsset->offset;
     heap_free(assetTableBuffer);
     return ret;
+#endif
 }
 
 #define AREA(area, jp_name) { ARRAY_COUNT(area##_maps), area##_maps, "area_" #area, jp_name }

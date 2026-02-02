@@ -99,7 +99,7 @@ u32 charset_ROM_START = 0;
 
 
 BackgroundHeader gBackgroundImage;
-
+u8 gBackgroundImage_padding[0x10000];
 // Audio RSP
 u8 n_aspMainTextStart[1];
 u8 n_aspMainDataStart[1];

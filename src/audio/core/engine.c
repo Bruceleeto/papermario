@@ -1188,6 +1188,9 @@ void au_set_bus_volume_level(s32 soundTypeFlags, u32 volPreset) {
 }
 
 s32 au_set_reverb_type(s32 soundTypeFlags, s32 reverbType) {
+#ifdef LINUX
+    return 0;
+#endif
     if (soundTypeFlags & AUDIO_TYPE_SFX) {
         return au_sfx_set_reverb_type(gSoundManager, reverbType);
     }

@@ -22,14 +22,17 @@ void load_map_bg(char* optAssetName) {
         char* assetName = optAssetName;
 
         if (evt_get_variable(nullptr, GB_StoryProgress) >= STORY_CH6_DESTROYED_PUFF_PUFF_MACHINE) {
-            // Use sunny Flower Fields bg rather than cloudy
             if (strcmp(assetName, gCloudyFlowerFieldsBg) == 0) {
                 assetName = gSunnyFlowerFieldsBg;
             }
         }
 
         compressedData = load_asset_by_name(assetName, &assetSize);
+#ifdef LINUX
+        memcpy(&gBackgroundImage, compressedData, assetSize);
+#else
         decode_yay0(compressedData, &gBackgroundImage);
+#endif
         general_heap_free(compressedData);
     }
 }

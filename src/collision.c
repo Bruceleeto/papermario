@@ -105,7 +105,11 @@ void load_map_hit_asset(void) {
     void* compressedData = load_asset_by_name(wMapHitName, &assetSize);
     HitFile* uncompressedData = heap_malloc(assetSize);
 
+#ifdef LINUX
+    memcpy(uncompressedData, compressedData, assetSize);
+#else
     decode_yay0(compressedData, uncompressedData);
+#endif
     general_heap_free(compressedData);
 
     map->hitAssetCollisionOffset = uncompressedData->collisionOffset;
@@ -116,7 +120,6 @@ void load_map_hit_asset(void) {
 
     heap_free(uncompressedData);
 }
-
 void restore_map_collision_data(void) {
     CollisionData* collisionData;
     Collider* collider;

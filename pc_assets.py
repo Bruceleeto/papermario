@@ -560,23 +560,104 @@ def convert_model_groups(data: bytearray, offset: int, visited: set):
         convert_model_groups(data, sibling_ptr, visited)
 
 def convert_hit_data(data: bytearray):
-    if len(data) < 4:
+    """Convert hit/collision data from BE to LE.
+
+    File layout:
+      HitFile (top-level, offset 0):
+        u32 collisionOffset
+        u32 zoneOffset
+
+      HitFileHeader (at collisionOffset and/or zoneOffset):
+        s16 numColliders;      +0x00
+        pad[2];                +0x02
+        s32 collidersOffset;   +0x04
+        s16 numVertices;       +0x08
+        pad[2];                +0x0A
+        s32 verticesOffset;    +0x0C
+        s16 bbDataSize;        +0x10
+        pad[2];                +0x12
+        s32 bbOffset;          +0x14
+
+      All sub-offsets are relative to the start of the file (the HitFile pointer).
+
+      Data blocks referenced:
+        - Bounding boxes: u32[bbDataSize]        at bbOffset
+        - Vertices:       Vec3s[numVertices]     at verticesOffset  (Vec3s = 3×s16, 6 bytes)
+        - Colliders:      HitAssetCollider[numColliders] at collidersOffset
+
+      HitAssetCollider (0x0C bytes):
+        s16 boundingBoxOffset; +0x00
+        s16 nextSibling;       +0x02
+        s16 firstChild;        +0x04
+        s16 numTriangles;      +0x06
+        s32 trianglesOffset;   +0x08
+
+      Triangle data: s32[numTriangles] at trianglesOffset (packed vertex indices + flags)
+    """
+    if len(data) < 8:
         return
 
-    pos = 0
-    offsets = []
-    while pos + 4 <= len(data):
-        val = read_u32_be(data, pos)
-        swap32(data, pos)
-        if val == 0 or val >= len(data):
-            break
-        offsets.append(val)
-        pos += 4
+    # --- HitFile header ---
+    collision_offset = read_u32_be(data, 0)
+    zone_offset      = read_u32_be(data, 4)
+    swap32(data, 0)
+    swap32(data, 4)
 
-    for i, off in enumerate(offsets):
-        end = offsets[i + 1] if i + 1 < len(offsets) else len(data)
-        if off < end:
-            swap16_range(data, off, (end - off) // 2)
+    for section_offset in (collision_offset, zone_offset):
+        if section_offset == 0 or section_offset + 0x18 > len(data):
+            continue
+
+        hdr = section_offset
+
+        # --- Read HitFileHeader (before swapping) ---
+        num_colliders    = read_i16_be(data, hdr + 0x00)
+        colliders_offset = read_i32_be(data, hdr + 0x04)
+        num_vertices     = read_i16_be(data, hdr + 0x08)
+        vertices_offset  = read_i32_be(data, hdr + 0x0C)
+        bb_data_size     = read_i16_be(data, hdr + 0x10)
+        bb_offset        = read_i32_be(data, hdr + 0x14)
+
+        # --- Swap HitFileHeader ---
+        swap16(data, hdr + 0x00)   # numColliders  (s16)
+        # 0x02-0x03 = padding
+        swap32(data, hdr + 0x04)   # collidersOffset (s32)
+        swap16(data, hdr + 0x08)   # numVertices   (s16)
+        # 0x0A-0x0B = padding
+        swap32(data, hdr + 0x0C)   # verticesOffset (s32)
+        swap16(data, hdr + 0x10)   # bbDataSize    (s16)
+        # 0x12-0x13 = padding
+        swap32(data, hdr + 0x14)   # bbOffset      (s32)
+
+        # --- Bounding boxes: u32[bbDataSize] ---
+        if bb_offset > 0 and bb_offset < len(data) and bb_data_size > 0:
+            swap32_range(data, bb_offset, bb_data_size)
+
+        # --- Vertices: Vec3s[numVertices]  (3 × s16 = 6 bytes each) ---
+        if vertices_offset > 0 and vertices_offset < len(data) and num_vertices > 0:
+            swap16_range(data, vertices_offset, num_vertices * 3)
+
+        # --- Colliders: HitAssetCollider[numColliders] ---
+        if colliders_offset > 0 and colliders_offset < len(data) and num_colliders > 0:
+            for c in range(num_colliders):
+                cpos = colliders_offset + c * 0x0C
+                if cpos + 0x0C > len(data):
+                    break
+
+                # Read triangle info before swapping
+                num_triangles    = read_i16_be(data, cpos + 0x06)
+                triangles_offset = read_i32_be(data, cpos + 0x08)
+
+                # Swap HitAssetCollider fields
+                swap16(data, cpos + 0x00)   # boundingBoxOffset (s16)
+                swap16(data, cpos + 0x02)   # nextSibling       (s16)
+                swap16(data, cpos + 0x04)   # firstChild        (s16)
+                swap16(data, cpos + 0x06)   # numTriangles      (s16)
+                swap32(data, cpos + 0x08)   # trianglesOffset   (s32)
+
+                # --- Triangle data: s32[numTriangles] ---
+                if (triangles_offset > 0 and triangles_offset < len(data)
+                        and num_triangles > 0):
+                    swap32_range(data, triangles_offset, num_triangles)
 
 def convert_tex_data(data: bytearray):
     pos = 0
