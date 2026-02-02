@@ -4,9 +4,7 @@
 #include "ld_addrs.h"
 #include "sprite/player.h"
 
-#ifdef LINUX
-#define SPRITE_ROM_START (0x019A3A30 + 0x10)
-#elif defined(SHIFT)
+#if defined(LINUX) || defined(SHIFT)
 #define SPRITE_ROM_START (u32) sprites_ROM_START + 0x10
 #elif VERSION_US || VERSION_IQUE
 #define SPRITE_ROM_START 0x1943000 + 0x10
