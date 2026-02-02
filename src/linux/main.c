@@ -16,10 +16,6 @@ void gfxRetrace_Callback(s32 gfxTaskNum);
 static SDL_Window* window;
 static SDL_GLContext glctx;
 
-// Address translation
-static u32 sN64ToPC_Offset = 0;
-static int sOffsetCalculated = 0;
-
 // RSP state
 static float sModelview[4][4];
 static float sProjection[4][4];
@@ -41,26 +37,50 @@ static float sPrimColor[4] = {1,1,1,1};
 static float sEnvColor[4] = {1,1,1,1};
 static u32 sFillColor = 0;
 
-// Current texture
+// Current texture image (from G_SETTIMG)
 static u32 sCurTexAddr = 0;
 static u32 sCurTexFmt = 0;
 static u32 sCurTexSiz = 0;
 static u32 sCurTexWidth = 0;
+
+// Active GL texture
 static GLuint sCurTexID = 0;
+
+// Tile descriptors
+typedef struct {
+    u32 fmt, siz, line, tmem, palette;
+    u32 cms, cmt, masks, maskt, shifts, shiftt;
+    // tile size (in 10.2 fixed point as stored)
+    u32 uls, ult, lrs, lrt;
+    // resolved texture address + dimensions for loaded tiles
+    u32 texAddr;
+    u32 texW, texH;
+    GLuint texID;
+} TileDescriptor;
+
+static TileDescriptor sTiles[8];
 
 // TLUT
 static u16 sTLUT[256];
 
+// RDPHALF storage for multi-word commands
+static u32 sRDPHalf1 = 0;
+static u32 sRDPHalf2 = 0;
+
+static int sFrameCount = 0;
+
+// Cycle type
+static u32 sCycleType = 0; // G_CYC_1CYCLE etc
+
 // ============================================================================
 // ADDRESS TRANSLATION
 // ============================================================================
-extern char __executable_start;  // Linker-provided symbol
-extern char _end;                // End of BSS
 
 void* pc_resolve_addr(u32 addr) {
     if (addr == 0) return NULL;
     return (void*)(uintptr_t)addr;
 }
+
 void gfx_swap_buffers(void) {
     SDL_GL_SwapWindow(window);
 }
@@ -95,7 +115,6 @@ static void mtx_mul(float r[4][4], float a[4][4], float b[4][4]) {
     memcpy(r, t, sizeof(t));
 }
 
-/* Convert N64 fixed-point matrix to float */
 static void mtx_l2f(float mf[4][4], Mtx* m) {
     int i, j;
     u32* src = (u32*)m->m;
@@ -132,12 +151,19 @@ static GLuint load_texture(u32 addr, u32 fmt, u32 siz, u32 w, u32 h) {
 
     swapped = (u8*)malloc(bytes);
     memcpy(swapped, src, bytes);
-    swap64(swapped, bytes);
+    /* Do NOT swap64 - data is raw ROM bytes, only need per-element endian swap */
 
     if (fmt == G_IM_FMT_RGBA && siz == G_IM_SIZ_16b) {
         u16* s = (u16*)swapped;
+        if (sFrameCount < 15 && w == 128) {
+            u8* raw = swapped;
+            printf("[TEX] first 16 raw bytes: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\n",
+                raw[0],raw[1],raw[2],raw[3],raw[4],raw[5],raw[6],raw[7],
+                raw[8],raw[9],raw[10],raw[11],raw[12],raw[13],raw[14],raw[15]);
+        }
         for (i = 0; i < w * h; i++) {
-            u16 p = (s[i] >> 8) | (s[i] << 8);
+            u16 raw = s[i];
+            u16 p = (raw >> 8) | (raw << 8); /* BE to LE */
             u8 r = ((p >> 11) & 0x1F) << 3;
             u8 g = ((p >> 6) & 0x1F) << 3;
             u8 b = ((p >> 1) & 0x1F) << 3;
@@ -157,7 +183,7 @@ static GLuint load_texture(u32 addr, u32 fmt, u32 siz, u32 w, u32 h) {
     } else if (fmt == G_IM_FMT_IA && siz == G_IM_SIZ_16b) {
         u16* s = (u16*)swapped;
         for (i = 0; i < w * h; i++) {
-            u16 p = (s[i] >> 8) | (s[i] << 8);
+            u16 p = s[i];
             u8 intensity = p >> 8;
             u8 alpha = p & 0xFF;
             pixels[i] = (alpha << 24) | (intensity << 16) | (intensity << 8) | intensity;
@@ -171,7 +197,6 @@ static GLuint load_texture(u32 addr, u32 fmt, u32 siz, u32 w, u32 h) {
         for (i = 0; i < w * h; i++) {
             u16 tlut = sTLUT[swapped[i]];
             u8 r, g, b, a;
-            tlut = (tlut >> 8) | (tlut << 8);
             r = ((tlut >> 11) & 0x1F) << 3;
             g = ((tlut >> 6) & 0x1F) << 3;
             b = ((tlut >> 1) & 0x1F) << 3;
@@ -183,15 +208,27 @@ static GLuint load_texture(u32 addr, u32 fmt, u32 siz, u32 w, u32 h) {
             u8 idx = (i & 1) ? (swapped[i/2] & 0xF) : (swapped[i/2] >> 4);
             u16 tlut = sTLUT[idx];
             u8 r, g, b, a;
-            tlut = (tlut >> 8) | (tlut << 8);
             r = ((tlut >> 11) & 0x1F) << 3;
             g = ((tlut >> 6) & 0x1F) << 3;
             b = ((tlut >> 1) & 0x1F) << 3;
             a = (tlut & 1) ? 255 : 0;
             pixels[i] = (a << 24) | (b << 16) | (g << 8) | r;
         }
+    } else if (fmt == G_IM_FMT_I && siz == G_IM_SIZ_4b) {
+        for (i = 0; i < w * h; i++) {
+            u8 v = (i & 1) ? (swapped[i/2] & 0xF) : (swapped[i/2] >> 4);
+            v = (v << 4) | v;
+            pixels[i] = (255 << 24) | (v << 16) | (v << 8) | v;
+        }
+    } else if (fmt == G_IM_FMT_IA && siz == G_IM_SIZ_4b) {
+        for (i = 0; i < w * h; i++) {
+            u8 v = (i & 1) ? (swapped[i/2] & 0xF) : (swapped[i/2] >> 4);
+            u8 intensity = (v >> 1) & 0x7;
+            u8 alpha = (v & 1) ? 255 : 0;
+            intensity = (intensity << 5) | (intensity << 2) | (intensity >> 1);
+            pixels[i] = (alpha << 24) | (intensity << 16) | (intensity << 8) | intensity;
+        }
     } else {
-        /* Unknown format - magenta */
         for (i = 0; i < w * h; i++)
             pixels[i] = 0xFFFF00FF;
     }
@@ -207,6 +244,35 @@ static GLuint load_texture(u32 addr, u32 fmt, u32 siz, u32 w, u32 h) {
     free(pixels);
     free(swapped);
     return tex;
+}
+
+// Load a sub-region of the current texture image into a tile via G_LOADTILE.
+// The coordinates are in 10.2 fixed point as the hardware uses.
+static void tile_load_region(int tile, u32 uls, u32 ult, u32 lrs, u32 lrt) {
+    TileDescriptor* t = &sTiles[tile];
+    // The region to load from the source image (in texels)
+    u32 sl = uls >> 2, tl = ult >> 2;
+    u32 sh = lrs >> 2, th = lrt >> 2;
+    u32 w = sh - sl + 1;
+    u32 h = th - tl + 1;
+
+    // Record source info on the render tile so G_TEXRECT can use it
+    // The actual render tile is set up by a subsequent G_SETTILE + G_SETTILESIZE,
+    // but the texture address comes from the last G_SETTIMG.
+    t->texAddr = sCurTexAddr;
+    t->texW = w;
+    t->texH = h;
+
+    // We don't actually build the GL texture here — we do it lazily when
+    // the render tile is configured (G_SETTILESIZE) or when G_TEXRECT fires.
+}
+
+// Ensure a GL texture exists for the given tile using the full source image dimensions.
+static void tile_ensure_texture(int tileIdx) {
+    TileDescriptor* t = &sTiles[tileIdx];
+    if (t->texID) return;
+    if (!t->texAddr || !t->texW || !t->texH) return;
+    t->texID = load_texture(t->texAddr, t->fmt, t->siz, t->texW, t->texH);
 }
 
 // ============================================================================
@@ -273,6 +339,51 @@ static void draw_tri(int v0, int v1, int v2) {
     glEnd();
 }
 
+// Draw a textured or colored rectangle (handles G_TEXRECT)
+static void draw_tex_rect(u32 xh, u32 yh, u32 tile, u32 xl, u32 yl,
+                           u32 s, u32 t, u32 dsdx, u32 dtdy) {
+    float x0 = xl / 4.0f;
+    float y0 = yl / 4.0f;
+    float x1 = xh / 4.0f;
+    float y1 = yh / 4.0f;
+    float s0, t0, s1, t1;
+    TileDescriptor* td = &sTiles[tile & 7];
+    float tw, th;
+    s16 ss = (s16)s, st = (s16)t;
+    s16 sdsdx = (s16)dsdx, sdtdy = (s16)dtdy;
+
+    if (sFrameCount < 15) {
+        printf("[DRAWTEX] rect=(%.1f,%.1f)-(%.1f,%.1f) tile=%u texID=%u texAddr=%p texW=%u texH=%u\n",
+            x0, y0, x1, y1, tile, td->texID, (void*)(uintptr_t)td->texAddr, td->texW, td->texH);
+    }
+
+    // Ensure the tile has a GL texture
+    tile_ensure_texture(tile & 7);
+
+    tw = (td->texW > 0) ? (float)td->texW : 1.0f;
+    th = (td->texH > 0) ? (float)td->texH : 1.0f;
+
+    // s,t are S10.5 fixed point; dsdx,dtdy are S5.10 fixed point
+    s0 = (ss / 32.0f) / tw;
+    t0 = (st / 32.0f) / th;
+    s1 = s0 + ((x1 - x0) * sdsdx / 1024.0f) / tw;
+    t1 = t0 + ((y1 - y0) * sdtdy / 1024.0f) / th;
+
+    if (td->texID) {
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, td->texID);
+    }
+    glDisable(GL_DEPTH_TEST);
+    glColor4f(1, 1, 1, 1);
+    glBegin(GL_QUADS);
+    glTexCoord2f(s0, t0); glVertex2f(x0, y0);
+    glTexCoord2f(s1, t0); glVertex2f(x1, y0);
+    glTexCoord2f(s1, t1); glVertex2f(x1, y1);
+    glTexCoord2f(s0, t1); glVertex2f(x0, y1);
+    glEnd();
+    glEnable(GL_DEPTH_TEST);
+}
+
 static void walk_dl(Gfx* dl, int depth) {
     int i;
 
@@ -289,7 +400,14 @@ static void walk_dl(Gfx* dl, int depth) {
             case G_RDPFULLSYNC:
             case G_RDPLOADSYNC:
             case G_RDPTILESYNC:
-                /* Sync commands - ignore */
+                break;
+
+            case G_RDPHALF_1:
+                sRDPHalf1 = w1;
+                break;
+
+            case G_RDPHALF_2:
+                sRDPHalf2 = w1;
                 break;
 
             case G_VTX:
@@ -337,7 +455,6 @@ static void walk_dl(Gfx* dl, int depth) {
                 if (target) {
                     walk_dl((Gfx*)target, depth + 1);
                 }
-                /* If push flag is set, return after the call */
                 if ((w0 >> 16) & 0xFF) return;
             } break;
 
@@ -354,6 +471,43 @@ static void walk_dl(Gfx* dl, int depth) {
                 sCurTexSiz = (w0 >> 19) & 0x3;
                 sCurTexWidth = (w0 & 0xFFF) + 1;
                 sCurTexAddr = w1;
+                if (sFrameCount < 15) {
+                    printf("[SETTIMG] addr=%p fmt=%d siz=%d w=%d\n", (void*)(uintptr_t)w1, sCurTexFmt, sCurTexSiz, sCurTexWidth);
+                }
+                break;
+
+            case G_SETTILE: {
+                int tileIdx = (w1 >> 24) & 0x7;
+                TileDescriptor* td = &sTiles[tileIdx];
+                td->fmt = (w0 >> 21) & 0x7;
+                td->siz = (w0 >> 19) & 0x3;
+                td->line = (w0 >> 9) & 0x1FF;
+                td->tmem = w0 & 0x1FF;
+                td->palette = (w1 >> 20) & 0xF;
+                td->cmt = (w1 >> 18) & 0x3;
+                td->maskt = (w1 >> 14) & 0xF;
+                td->shiftt = (w1 >> 10) & 0xF;
+                td->cms = (w1 >> 8) & 0x3;
+                td->masks = (w1 >> 4) & 0xF;
+                td->shifts = w1 & 0xF;
+            } break;
+
+            case G_LOADTILE: {
+                int tileIdx = (w1 >> 24) & 0x7;
+                u32 uls = (w0 >> 12) & 0xFFF;
+                u32 ult = w0 & 0xFFF;
+                u32 lrs = (w1 >> 12) & 0xFFF;
+                u32 lrt = w1 & 0xFFF;
+                tile_load_region(tileIdx, uls, ult, lrs, lrt);
+                // Also propagate address to the render tile (tile 0)
+                // since gDPLoadTextureTile loads via G_TX_LOADTILE then
+                // sets up G_TX_RENDERTILE with a separate G_SETTILE+G_SETTILESIZE
+                sTiles[0].texAddr = sCurTexAddr;
+            } break;
+
+            case G_LOADBLOCK:
+                // Simplified: record dimensions from the block load
+                // The subsequent G_SETTILE + G_SETTILESIZE will set up the render tile
                 break;
 
             case G_LOADTLUT: {
@@ -361,24 +515,87 @@ static void walk_dl(Gfx* dl, int depth) {
                 void* data = pc_resolve_addr(sCurTexAddr);
                 if (data && count <= 256) {
                     memcpy(sTLUT, data, count * 2);
-                    swap64((u8*)sTLUT, count * 2);
                 }
             } break;
 
             case G_SETTILESIZE: {
-                int tile = (w1 >> 24) & 0x7;
-                u32 lrs = (w1 >> 12) & 0xFFF;
-                u32 lrt = w1 & 0xFFF;
-                int w = (lrs >> 2) + 1;
-                int h = (lrt >> 2) + 1;
-                if (tile == 0 && sCurTexAddr) {
-                    if (sCurTexID) glDeleteTextures(1, &sCurTexID);
-                    sCurTexID = load_texture(sCurTexAddr, sCurTexFmt, sCurTexSiz, w, h);
-                    if (sCurTexID) {
-                        glEnable(GL_TEXTURE_2D);
-                        glBindTexture(GL_TEXTURE_2D, sCurTexID);
-                    }
+                int tileIdx = (w1 >> 24) & 0x7;
+                TileDescriptor* td = &sTiles[tileIdx];
+                td->uls = (w0 >> 12) & 0xFFF;
+                td->ult = w0 & 0xFFF;
+                td->lrs = (w1 >> 12) & 0xFFF;
+                td->lrt = w1 & 0xFFF;
+
+                // If this is the render tile and we have a loaded texture addr,
+                // update dimensions and build the GL texture
+                if (td->texAddr) {
+                    u32 w = (td->lrs >> 2) - (td->uls >> 2) + 1;
+                    u32 h = (td->lrt >> 2) - (td->ult >> 2) + 1;
+                    td->texW = w;
+                    td->texH = h;
+                    if (td->texID) glDeleteTextures(1, &td->texID);
+                    td->texID = load_texture(td->texAddr, td->fmt, td->siz, w, h);
+                } else if (sCurTexAddr) {
+                    // Fallback: use the global SETTIMG address
+                    u32 w = (td->lrs >> 2) + 1;
+                    u32 h = (td->lrt >> 2) + 1;
+                    td->texAddr = sCurTexAddr;
+                    td->texW = w;
+                    td->texH = h;
+                    if (td->texID) glDeleteTextures(1, &td->texID);
+                    td->texID = load_texture(sCurTexAddr, sCurTexFmt, sCurTexSiz, w, h);
                 }
+
+                // Also keep legacy sCurTexID for 3D triangle path
+                if (tileIdx == 0 && td->texID) {
+                    sCurTexID = td->texID;
+                    glEnable(GL_TEXTURE_2D);
+                    glBindTexture(GL_TEXTURE_2D, sCurTexID);
+                }
+            } break;
+
+            case G_TEXRECT:
+            case G_TEXRECTFLIP: {
+                if (sFrameCount < 15) {
+                    printf("[TEXRECT] w0=0x%08X w1=0x%08X\n", w0, w1);
+                }
+                // G_TEXRECT is 128 bits via gSPTextureRectangle:
+                //   word0: cmd:8 | xh:12 | yh:12
+                //   word1: tile:3 | xl:12 | yl:12
+                //   next Gfx (G_RDPHALF_1): s:16 | t:16
+                //   next Gfx (G_RDPHALF_2): dsdx:16 | dtdy:16
+                u32 xh = (w0 >> 12) & 0xFFF;
+                u32 yh = w0 & 0xFFF;
+                u32 tile = (w1 >> 24) & 0x7;
+                u32 xl = (w1 >> 12) & 0xFFF;
+                u32 yl = w1 & 0xFFF;
+                u32 stword, dword;
+                u32 s_val, t_val, dsdx_val, dtdy_val;
+                u8 nextCmd;
+
+                // Read the next two Gfx words for s/t and dsdx/dtdy
+                // They come as G_RDPHALF_1 and G_RDPHALF_2
+                i++;
+                nextCmd = (dl[i].words.w0 >> 24) & 0xFF;
+                if (nextCmd == G_RDPHALF_1) {
+                    stword = dl[i].words.w1;
+                } else {
+                    stword = dl[i].words.w0;
+                }
+                i++;
+                nextCmd = (dl[i].words.w0 >> 24) & 0xFF;
+                if (nextCmd == G_RDPHALF_2) {
+                    dword = dl[i].words.w1;
+                } else {
+                    dword = dl[i].words.w0;
+                }
+
+                s_val = (stword >> 16) & 0xFFFF;
+                t_val = stword & 0xFFFF;
+                dsdx_val = (dword >> 16) & 0xFFFF;
+                dtdy_val = dword & 0xFFFF;
+
+                draw_tex_rect(xh, yh, tile, xl, yl, s_val, t_val, dsdx_val, dtdy_val);
             } break;
 
             case G_SETPRIMCOLOR:
@@ -407,7 +624,6 @@ static void walk_dl(Gfx* dl, int depth) {
                 u16 c;
                 float r, g, b;
 
-                /* Skip zbuffer clears */
                 if (sFillColor == 0xFFFCFFFC) break;
 
                 c = sFillColor >> 16;
@@ -415,6 +631,7 @@ static void walk_dl(Gfx* dl, int depth) {
                 g = ((c >> 6) & 0x1F) / 31.0f;
                 b = ((c >> 1) & 0x1F) / 31.0f;
 
+                glDisable(GL_DEPTH_TEST);
                 glDisable(GL_TEXTURE_2D);
                 glColor3f(r, g, b);
                 glBegin(GL_QUADS);
@@ -423,27 +640,33 @@ static void walk_dl(Gfx* dl, int depth) {
                 glVertex2f(xh, yh);
                 glVertex2f(xl, yh);
                 glEnd();
+                glEnable(GL_DEPTH_TEST);
+            } break;
+
+            case G_SETOTHERMODE_H: {
+                // Extract cycle type from othermode_h
+                u32 shift = (w0 >> 8) & 0xFF;
+                u32 len = (w0 & 0xFF) + 1;
+                // Cycle type is bits 52-53 of othermode (shift=20, len=2)
+                if (shift == 20 && len == 2) {
+                    sCycleType = w1 >> 20;
+                }
             } break;
 
             case G_SETSCISSOR:
-                /* TODO: implement scissor */
-                break;
-
             case G_GEOMETRYMODE:
             case G_SETOTHERMODE_L:
-            case G_SETOTHERMODE_H:
             case G_SETCOMBINE:
-            case G_SETTILE:
-            case G_LOADBLOCK:
             case G_MOVEMEM:
             case G_MOVEWORD:
             case G_SETZIMG:
             case G_SETCIMG:
-                /* TODO: implement these */
+            case G_SETBLENDCOLOR:
+            case G_SETFOGCOLOR:
+            case G_SETPRIMDEPTH:
                 break;
 
             default:
-                /* Unknown command */
                 break;
         }
     }
@@ -474,20 +697,53 @@ void pc_init_gfx(void) {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
 
+    memset(sTiles, 0, sizeof(sTiles));
+
     printf("OpenGL initialized\n");
 }
 
 void pc_process_displaylist(Gfx* dl) {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    int j;
+    u8 firstCmd;
+
+    if (sFrameCount == 8) {
+        extern u8* gLogosImages;
+        if (gLogosImages) {
+            printf("[CHECK] gLogosImages=%p first bytes: %02X %02X %02X %02X %02X %02X %02X %02X\n",
+                (void*)gLogosImages,
+                gLogosImages[0], gLogosImages[1], gLogosImages[2], gLogosImages[3],
+                gLogosImages[4], gLogosImages[5], gLogosImages[6], gLogosImages[7]);
+            printf("[CHECK] SETTIMG addr 0x8fb1010 vs gLogosImages+0=%p\n", (void*)(gLogosImages + 0));
+        } else {
+            printf("[CHECK] gLogosImages is NULL!\n");
+        }
+    }
+
+    // Detect if this is a background DL (starts with G_MOVEWORD 0xDB)
+    // or a main DL (starts with G_MTX 0xDA). Only clear on background.
+    firstCmd = (dl[0].words.w0 >> 24) & 0xFF;
+    if (firstCmd == G_MOVEWORD || firstCmd == G_NOOP) {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    }
 
     mtx_identity(sModelview);
     mtx_identity(sProjection);
     mtx_identity(sMVP);
     sTexScaleS = sTexScaleT = 0xFFFF;
+    sRDPHalf1 = sRDPHalf2 = 0;
+
+    // Clean up previous frame's tile textures
+    for (j = 0; j < 8; j++) {
+        if (sTiles[j].texID) {
+            glDeleteTextures(1, &sTiles[j].texID);
+        }
+        memset(&sTiles[j], 0, sizeof(TileDescriptor));
+    }
+    sCurTexID = 0;
 
     walk_dl(dl, 0);
 
-    //SDL_GL_SwapWindow(window);
+    sFrameCount++;
 }
 
 void linux_main_loop(void) {

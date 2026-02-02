@@ -422,7 +422,8 @@ ALL_OBJS := $(SRC_OBJS) $(VER_OBJS)
 all: $(TARGET)
 
 $(TARGET): $(ALL_OBJS)
-	$(CC) -m32 $(ALL_OBJS) -o $@ -lSDL2 -lGL -lm
+	$(CC) -m32 $(ALL_OBJS) -o $@ -lSDL2 -lGL -lm -Wl,--just-symbols=assets_le/pc_rom_addrs.ld
+
 
 $(BUILD_DIR)/src/%.o: src/%.c
 	@mkdir -p $(dir $@)

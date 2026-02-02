@@ -7,7 +7,8 @@ Checks:
 2. Sprite offset tables have reasonable values
 3. Icon palettes have valid RGBA5551 colors
 4. Message section tables are valid
-5. Round-trip test: swap back to BE, compare specific values
+5. Logos images have expected size and non-trivial content
+6. Round-trip test: swap back to BE, compare specific values
 """
 
 import struct
@@ -54,7 +55,6 @@ def validate_mapfs(data: bytes) -> Tuple[bool, List[str]]:
     if len(data) < 0x40:
         return False, ["MapFS too small"]
 
-    # Parse TOC entries
     entries = []
     pos = 0x20
     while pos + 0x1C <= len(data):
@@ -66,13 +66,12 @@ def validate_mapfs(data: bytes) -> Tuple[bool, List[str]]:
         size = read_u32_le(data, pos + 0x14)
         decomp_size = read_u32_le(data, pos + 0x18)
 
-        # Validate
         if offset > len(data):
             errors.append(f"{name}: offset 0x{offset:X} > file size 0x{len(data):X}")
         elif offset + size > len(data):
             errors.append(f"{name}: data extends past EOF")
 
-        if size > 0x1000000:  # >16MB is suspicious
+        if size > 0x1000000:
             warnings.append(f"{name}: unusually large size 0x{size:X}")
 
         entries.append((name, offset, size, decomp_size))
@@ -80,10 +79,8 @@ def validate_mapfs(data: bytes) -> Tuple[bool, List[str]]:
 
     print(f"    Parsed {len(entries)} TOC entries")
 
-    # Spot check: first few entries should have valid data
     for name, offset, size, _ in entries[:5]:
         if offset > 0 and offset + 0x20 <= len(data):
-            # Check if data region looks valid (not all zeros or all 0xFF)
             sample = data[0x20 + offset:0x20 + offset + 0x20]
             if sample == b'\x00' * 0x20:
                 warnings.append(f"{name}: data region is all zeros")
@@ -95,6 +92,7 @@ def validate_mapfs(data: bytes) -> Tuple[bool, List[str]]:
 
     return len(errors) == 0, errors
 
+
 def validate_sprites(data: bytes) -> Tuple[bool, List[str]]:
     """Validate sprite offset tables"""
     errors = []
@@ -102,7 +100,6 @@ def validate_sprites(data: bytes) -> Tuple[bool, List[str]]:
     if len(data) < 0x20:
         return False, ["Sprite data too small"]
 
-    # Read header (now LE)
     player_raster_off = read_u32_le(data, 0x10) + 0x10
     player_yay0_off = read_u32_le(data, 0x14) + 0x10
     npc_yay0_off = read_u32_le(data, 0x18) + 0x10
@@ -114,14 +111,12 @@ def validate_sprites(data: bytes) -> Tuple[bool, List[str]]:
     print(f"      npc_yay0:      0x{npc_yay0_off:X}")
     print(f"      sprite_end:    0x{sprite_end_off:X}")
 
-    # Validate offsets are in order
     if not (player_raster_off < player_yay0_off < npc_yay0_off <= sprite_end_off):
         errors.append("Header offsets not in expected order")
 
     if sprite_end_off > len(data):
         errors.append(f"sprite_end 0x{sprite_end_off:X} > file size 0x{len(data):X}")
 
-    # Check player raster table header
     if player_raster_off + 12 <= len(data):
         idx_off = read_u32_le(data, player_raster_off)
         info_off = read_u32_le(data, player_raster_off + 4)
@@ -137,17 +132,13 @@ def validate_sprites(data: bytes) -> Tuple[bool, List[str]]:
 
     return len(errors) == 0, errors
 
+
 def validate_icons(data: bytes) -> Tuple[bool, List[str]]:
     """Validate icon data"""
     errors = []
 
-    # Sample some 16-bit values that should be valid RGBA5551 colors
-    # In a palette, values should generally not be 0x0000 for all entries
-
-    # Check first potential palette region (after first CI4 raster)
-    # Assuming 24x24 CI4 icon = 288 bytes raster, then 32 byte palette
     if len(data) >= 320:
-        pal_offset = 288  # After first 24x24 CI4 raster
+        pal_offset = 288
         nonzero = 0
         for i in range(16):
             color = read_u16_le(data, pal_offset + i * 2)
@@ -161,6 +152,7 @@ def validate_icons(data: bytes) -> Tuple[bool, List[str]]:
 
     return len(errors) == 0, errors
 
+
 def validate_msg(data: bytes) -> Tuple[bool, List[str]]:
     """Validate message section table"""
     errors = []
@@ -168,7 +160,6 @@ def validate_msg(data: bytes) -> Tuple[bool, List[str]]:
     if len(data) < 8:
         return False, ["Message data too small"]
 
-    # Read section offsets (should be reasonable values after LE conversion)
     sections = []
     pos = 0
     while pos + 4 <= len(data):
@@ -183,25 +174,94 @@ def validate_msg(data: bytes) -> Tuple[bool, List[str]]:
 
     print(f"    Found {len(sections)} message sections")
 
-    # Validate section offsets are ascending
     for i in range(1, len(sections)):
         if sections[i] <= sections[i-1]:
             errors.append(f"Section {i} offset not ascending")
 
     return len(errors) == 0, errors
 
+
 def validate_charset(data: bytes) -> Tuple[bool, List[str]]:
     """Validate charset data"""
     errors = []
 
-    # Charset is CI4 rasters + palettes
-    # Just check size is reasonable
     if len(data) < 1000:
         errors.append("Charset suspiciously small")
 
     print(f"    Size: {len(data):,} bytes")
 
     return len(errors) == 0, errors
+
+
+def validate_logos(data: bytes) -> Tuple[bool, List[str]]:
+    """Validate logos data - three RGBA16 images byte-swapped from BE.
+
+    Expected layout:
+      0x00000: Image1 (N64 logo)       128x112 RGBA16 = 0x7000 bytes
+      0x07000: Image3 (IS logo)        256x112 RGBA16 = 0xE000 bytes
+      0x15000: Image2 (Nintendo logo)  256x48  RGBA16 = 0x6000 bytes
+    Total expected: >= 0x1B000 bytes
+    """
+    errors = []
+
+    EXPECTED_MIN = 0x1B000
+
+    print(f"    Size: {len(data):,} bytes (expected >= 0x{EXPECTED_MIN:X})")
+
+    if len(data) < EXPECTED_MIN:
+        errors.append(
+            f"Logos data too small: {len(data):,} bytes, "
+            f"expected at least 0x{EXPECTED_MIN:X}"
+        )
+        return False, errors
+
+    images = [
+        ("Image1 (N64 logo)",      0x00000, 128, 112),
+        ("Image3 (IS logo)",       0x07000, 256, 112),
+        ("Image2 (Nintendo logo)", 0x15000, 256,  48),
+    ]
+
+    for name, offset, w, h in images:
+        img_size = w * h * 2
+        region = data[offset:offset + img_size]
+
+        # Check not all zeros
+        if region == b'\x00' * img_size:
+            errors.append(f"{name}: entirely zero (conversion likely failed)")
+            continue
+
+        # Check not all 0xFF
+        if region == b'\xFF' * img_size:
+            errors.append(f"{name}: entirely 0xFF")
+            continue
+
+        # Sample pixels as LE RGBA5551 - check alpha bit distribution
+        # In RGBA5551, bit 0 is the alpha flag.
+        # Logo images are drawn on a filled background so most pixels
+        # should have alpha set.
+        alpha_set = 0
+        sample_count = min(256, w * h)
+        step = max(1, (w * h) // sample_count)
+        sampled = 0
+        for i in range(0, w * h, step):
+            px = read_u16_le(data, offset + i * 2)
+            if px & 1:
+                alpha_set += 1
+            sampled += 1
+
+        pct = (alpha_set / sampled) * 100 if sampled else 0
+        print(f"    {name}: {w}x{h}  alpha-set: {pct:.0f}% of {sampled} sampled")
+
+        # If almost no pixels have alpha set, the bytes are probably
+        # still in BE order (the alpha bit would be in the wrong byte).
+        if pct < 10:
+            errors.append(
+                f"{name}: only {pct:.0f}% of sampled pixels have alpha set "
+                f"(expected high %; may still be BE)"
+            )
+
+    return len(errors) == 0, errors
+
 
 def compare_with_original() -> Tuple[bool, List[str]]:
     """Compare specific values with original ROM to verify conversion"""
@@ -217,10 +277,8 @@ def compare_with_original() -> Tuple[bool, List[str]]:
     if mapfs_path.exists():
         mapfs = mapfs_path.read_bytes()
 
-        # Original MapFS ROM offset (from vrom_table)
         rom_start = 0x01EA0A30
 
-        # Check first TOC entry name matches
         orig_name = decode_string(rom[rom_start + 0x20:rom_start + 0x30])
         conv_name = decode_string(mapfs[0x20:0x30])
 
@@ -229,7 +287,6 @@ def compare_with_original() -> Tuple[bool, List[str]]:
         else:
             errors.append(f"MapFS name mismatch: orig='{orig_name}' conv='{conv_name}'")
 
-        # Check offset value is byte-swapped correctly
         orig_offset = read_u32_be(rom, rom_start + 0x30)
         conv_offset = read_u32_le(mapfs, 0x30)
 
@@ -251,11 +308,12 @@ def main():
     all_passed = True
 
     validators = [
-        ("mapfs.bin", validate_mapfs),
-        ("sprite.bin", validate_sprites),
-        ("icon.bin", validate_icons),
-        ("msg.bin", validate_msg),
+        ("mapfs.bin",   validate_mapfs),
+        ("sprite.bin",  validate_sprites),
+        ("icon.bin",    validate_icons),
+        ("msg.bin",     validate_msg),
         ("charset.bin", validate_charset),
+        ("logos.bin",   validate_logos),
     ]
 
     for filename, validator in validators:
@@ -270,12 +328,12 @@ def main():
         print(f"  Size: {len(data):,} bytes")
 
         try:
-            passed, errors = validator(data)
+            passed, errs = validator(data)
             if passed:
                 print(f"  PASS")
             else:
                 print(f"  FAIL:")
-                for e in errors:
+                for e in errs:
                     print(f"    - {e}")
                 all_passed = False
         except Exception as e:
@@ -285,12 +343,12 @@ def main():
     # Compare with original ROM
     print(f"\nComparison with original ROM:")
     try:
-        passed, errors = compare_with_original()
+        passed, errs = compare_with_original()
         if passed:
             print(f"  PASS")
         else:
             print(f"  FAIL:")
-            for e in errors:
+            for e in errs:
                 print(f"    - {e}")
             all_passed = False
     except Exception as e:
