@@ -155,12 +155,12 @@ static GLuint load_texture(u32 addr, u32 fmt, u32 siz, u32 w, u32 h) {
 
     if (fmt == G_IM_FMT_RGBA && siz == G_IM_SIZ_16b) {
         u16* s = (u16*)swapped;
-        if (sFrameCount < 15 && w == 128) {
-            u8* raw = swapped;
-            printf("[TEX] first 16 raw bytes: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\n",
-                raw[0],raw[1],raw[2],raw[3],raw[4],raw[5],raw[6],raw[7],
-                raw[8],raw[9],raw[10],raw[11],raw[12],raw[13],raw[14],raw[15]);
-        }
+ //       if (sFrameCount < 15 && w == 128) {
+   //         u8* raw = swapped;
+     //       printf("[TEX] first 16 raw bytes: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\n",
+       //         raw[0],raw[1],raw[2],raw[3],raw[4],raw[5],raw[6],raw[7],
+         //       raw[8],raw[9],raw[10],raw[11],raw[12],raw[13],raw[14],raw[15]);
+      //  }
         for (i = 0; i < w * h; i++) {
             u16 raw = s[i];
             u16 p = (raw >> 8) | (raw << 8); /* BE to LE */
@@ -352,10 +352,10 @@ static void draw_tex_rect(u32 xh, u32 yh, u32 tile, u32 xl, u32 yl,
     s16 ss = (s16)s, st = (s16)t;
     s16 sdsdx = (s16)dsdx, sdtdy = (s16)dtdy;
 
-    if (sFrameCount < 15) {
-        printf("[DRAWTEX] rect=(%.1f,%.1f)-(%.1f,%.1f) tile=%u texID=%u texAddr=%p texW=%u texH=%u\n",
-            x0, y0, x1, y1, tile, td->texID, (void*)(uintptr_t)td->texAddr, td->texW, td->texH);
-    }
+  //  if (sFrameCount < 15) {
+    //    printf("[DRAWTEX] rect=(%.1f,%.1f)-(%.1f,%.1f) tile=%u texID=%u texAddr=%p texW=%u texH=%u\n",
+      //      x0, y0, x1, y1, tile, td->texID, (void*)(uintptr_t)td->texAddr, td->texW, td->texH);
+   // }
 
     // Ensure the tile has a GL texture
     tile_ensure_texture(tile & 7);
@@ -471,9 +471,9 @@ static void walk_dl(Gfx* dl, int depth) {
                 sCurTexSiz = (w0 >> 19) & 0x3;
                 sCurTexWidth = (w0 & 0xFFF) + 1;
                 sCurTexAddr = w1;
-                if (sFrameCount < 15) {
-                    printf("[SETTIMG] addr=%p fmt=%d siz=%d w=%d\n", (void*)(uintptr_t)w1, sCurTexFmt, sCurTexSiz, sCurTexWidth);
-                }
+             //   if (sFrameCount < 15) {
+               //     printf("[SETTIMG] addr=%p fmt=%d siz=%d w=%d\n", (void*)(uintptr_t)w1, sCurTexFmt, sCurTexSiz, sCurTexWidth);
+              //  }
                 break;
 
             case G_SETTILE: {
@@ -556,9 +556,9 @@ static void walk_dl(Gfx* dl, int depth) {
 
             case G_TEXRECT:
             case G_TEXRECTFLIP: {
-                if (sFrameCount < 15) {
-                    printf("[TEXRECT] w0=0x%08X w1=0x%08X\n", w0, w1);
-                }
+            //    if (sFrameCount < 15) {
+              //      printf("[TEXRECT] w0=0x%08X w1=0x%08X\n", w0, w1);
+                //}
                 // G_TEXRECT is 128 bits via gSPTextureRectangle:
                 //   word0: cmd:8 | xh:12 | yh:12
                 //   word1: tile:3 | xl:12 | yl:12

@@ -10,6 +10,7 @@
 #include <stdio.h>
 #ifdef LINUX
 #include "shape_relocate.h"
+#include <stdint.h>
 #endif
 
 
@@ -333,6 +334,7 @@ s32 get_asset_offset(char* assetName, s32* compressedSize) {
     char path[256];
     FILE* f;
     long size;
+    void* buf;
 
     snprintf(path, sizeof(path), "assets_le/maps/%s.bin", assetName);
     f = fopen(path, "rb");
@@ -342,9 +344,15 @@ s32 get_asset_offset(char* assetName, s32* compressedSize) {
     }
     fseek(f, 0, SEEK_END);
     size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    buf = general_heap_malloc(size);
+    fread(buf, 1, size, f);
     fclose(f);
     *compressedSize = size;
-    return 0;
+    // Return the buffer pointer as the "ROM address".
+    // nuPiReadRom will see it's not a known VROM range
+    // and treat it as a direct memory pointer.
+    return (s32)(uintptr_t)buf;
 #else
     AssetHeader firstHeader;
     AssetHeader* assetTableBuffer;
@@ -364,6 +372,7 @@ s32 get_asset_offset(char* assetName, s32* compressedSize) {
     return ret;
 #endif
 }
+
 
 #define AREA(area, jp_name) { ARRAY_COUNT(area##_maps), area##_maps, "area_" #area, jp_name }
 

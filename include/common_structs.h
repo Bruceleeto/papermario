@@ -1033,7 +1033,19 @@ typedef struct TextureHeader {
     /* 0x24 */ u16 auxH;
     /* 0x26 */ u16 mainH;
     /* 0x28 */ u8 isVariant;
-    /* 0x29 */ u8 extraTiles; // 0 - none, 1 - mipmap, 2 - ?, 3 - use aux tile
+    /* 0x29 */ u8 extraTiles;
+#ifdef LINUX
+    /* 0x2A */ u8 auxCombineSubType : 2;
+    /* 0x2A */ u8 auxCombineType : 6;
+    /* 0x2B */ u8 mainFmt : 4;
+    /* 0x2B */ u8 auxFmt : 4;
+    /* 0x2C */ u8 mainBitDepth : 4;
+    /* 0x2C */ u8 auxBitDepth : 4;
+    /* 0x2D */ u8 mainWrapW : 4;
+    /* 0x2D */ u8 auxWrapW : 4;
+    /* 0x2E */ u8 mainWrapH : 4;
+    /* 0x2E */ u8 auxWrapH : 4;
+#else
     /* 0x2A */ u8 auxCombineType : 6;
     /* 0x2A */ u8 auxCombineSubType : 2;
     /* 0x2B */ u8 auxFmt : 4;
@@ -1044,6 +1056,7 @@ typedef struct TextureHeader {
     /* 0x2D */ u8 mainWrapW : 4;
     /* 0x2E */ u8 auxWrapH : 4;
     /* 0x2E */ u8 mainWrapH : 4;
+#endif
     /* 0x2F */ u8 filtering;
 } TextureHeader; // size = 0x30
 

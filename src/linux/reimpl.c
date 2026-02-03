@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include "../assets_le/vrom_table.h"
 
 // RSP microcode - dummy addresses
@@ -61,7 +62,6 @@ u32 dgb_01_smash_bridges_ROM_END = 0;
 u32 icon_ROM_START = 0;
 u32 msg_ROM_START = 0;
 u32 audio_ROM_START = 0;
-u32 title_bg_1_ROM_START = 0;
 u32 sprite_shading_profiles_ROM_START = 0;
 u32 sprite_shading_profiles_data_ROM_START = 0;
 u32 entity_model_Signpost_ROM_START = 0;
@@ -292,7 +292,6 @@ void nuPiReadRom(u32 rom_addr, void* buf_ptr, u32 size) {
     char path[256];
     FILE* f;
 
-    /* Audio range - not real ROM, skip */
     if (rom_addr >= 0xB0000000) {
         memset(buf_ptr, 0, size);
         return;
@@ -301,6 +300,12 @@ void nuPiReadRom(u32 rom_addr, void* buf_ptr, u32 size) {
     entry = vrom_find(rom_addr);
 
     if (!entry) {
+        // On PC, addresses not in VROM table may be direct memory pointers
+        // (e.g. texture data loaded into a heap buffer by get_asset_offset)
+        if (rom_addr >= 0x1000 && rom_addr < 0x80000000) {
+            memcpy(buf_ptr, (void*)(uintptr_t)rom_addr, size);
+            return;
+        }
         printf("nuPiReadRom: unknown addr 0x%08X size 0x%X\n", rom_addr, size);
         memset(buf_ptr, 0, size);
         return;
@@ -320,7 +325,6 @@ void nuPiReadRom(u32 rom_addr, void* buf_ptr, u32 size) {
     fread(buf_ptr, 1, size, f);
     fclose(f);
 }
-
 
 
 // Decompression may need to fix up later or no op later..

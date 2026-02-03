@@ -627,6 +627,7 @@ void func_802C3EE4(void) {
 
     for (i = 0; i < gScriptListCount; i++) {
         temp = (s32) (*gCurrentScriptListPtr)[gScriptIndexList[i]];
+        if (temp == 0) continue;
         temp = *((s32*) temp);
         if (temp == gScriptIdList[i]) {
             temp = 1;

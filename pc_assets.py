@@ -558,19 +558,26 @@ def convert_hit_data(data: bytearray):
 
 def convert_tex_data(data: bytearray):
     pos = 0
+    tex_idx = 0
+
+    print(f"    [convert_tex_data] total size=0x{len(data):X} ({len(data)} bytes)")
 
     while pos + 48 <= len(data):
         name_end = data[pos:pos+32].find(0)
         if name_end <= 0:
+            print(f"    [tex {tex_idx}] pos=0x{pos:X}: no valid name (name_end={name_end}), stopping")
             break
 
         try:
             name = data[pos:pos+name_end].decode('ascii')
             if not all(c.isprintable() or c.isspace() for c in name):
+                print(f"    [tex {tex_idx}] pos=0x{pos:X}: non-printable name, stopping")
                 break
         except:
+            print(f"    [tex {tex_idx}] pos=0x{pos:X}: decode error, stopping")
             break
 
+        # Read header fields BEFORE swapping
         aux_w = read_u16_be(data, pos + 32)
         main_w = read_u16_be(data, pos + 34)
         aux_h = read_u16_be(data, pos + 36)
@@ -584,6 +591,7 @@ def convert_tex_data(data: bytearray):
         aux_fmt = (fmts >> 4) & 0xF
         aux_depth = (depths >> 4) & 0xF
 
+        # Swap the 4 u16 header fields
         swap16_range(data, pos + 32, 4)
 
         def raster_size(w, h, depth):
@@ -601,50 +609,70 @@ def convert_tex_data(data: bytearray):
         main_raster_sz = raster_size(main_w, main_h, main_depth)
         main_pal_sz = palette_size(main_fmt, main_depth)
 
+        print(f"    [tex {tex_idx}] pos=0x{pos:X} name='{name}' "
+              f"main={main_w}x{main_h} aux={aux_w}x{aux_h} "
+              f"extra_tiles={extra_tiles} fmt={main_fmt} depth={main_depth} "
+              f"aux_fmt={aux_fmt} aux_depth={aux_depth} "
+              f"raster_sz=0x{main_raster_sz:X} pal_sz=0x{main_pal_sz:X}")
+
+        # Swap main raster
         if main_fmt == 0:
             if main_depth == 2:
                 swap16_range(data, raster_start, main_w * main_h)
             elif main_depth == 3:
                 swap32_range(data, raster_start, main_w * main_h)
-
         if main_fmt == 3 and main_depth == 2:
             swap16_range(data, raster_start, main_w * main_h)
 
-        if main_fmt == 2:
-            pal_start = raster_start + main_raster_sz
-            pal_colors = 16 if main_depth == 0 else 256
-            swap16_range(data, pal_start, pal_colors)
-
+        # Handle mipmaps
         if extra_tiles == 1:
             mipmap_pos = raster_start + main_raster_sz
             divisor = 2
+            mm_count = 0
             while main_w // divisor >= (16 >> main_depth) and main_h // divisor > 0:
                 mm_w = main_w // divisor
                 mm_h = main_h // divisor
                 mm_sz = raster_size(mm_w, mm_h, main_depth)
                 if main_fmt == 0 and main_depth == 2:
                     swap16_range(data, mipmap_pos, mm_w * mm_h)
+                elif main_fmt == 0 and main_depth == 3:
+                    swap32_range(data, mipmap_pos, mm_w * mm_h)
+                elif main_fmt == 3 and main_depth == 2:
+                    swap16_range(data, mipmap_pos, mm_w * mm_h)
                 mipmap_pos += mm_sz
                 divisor *= 2
+                mm_count += 1
+
+            # Include mipmaps in main_raster_sz
+            main_raster_sz = mipmap_pos - raster_start
+            print(f"           mipmaps={mm_count} updated raster_sz=0x{main_raster_sz:X}")
+
+            # Palette after mipmaps
             if main_fmt == 2:
                 pal_colors = 16 if main_depth == 0 else 256
                 swap16_range(data, mipmap_pos, pal_colors)
                 main_pal_sz = pal_colors * 2
+        else:
+            # Non-mipmap: palette right after main raster
+            if main_fmt == 2:
+                pal_start = raster_start + main_raster_sz
+                pal_colors = 16 if main_depth == 0 else 256
+                swap16_range(data, pal_start, pal_colors)
 
         aux_start = raster_start + main_raster_sz + main_pal_sz
 
         if extra_tiles == 2:
-            aux_raster_sz = raster_size(main_w, main_h // 2, main_depth)
-            if main_fmt == 0 and main_depth == 2:
-                swap16_range(data, aux_start, main_w * (main_h // 2))
-            aux_start += aux_raster_sz
-
+            # SHARED_AUX: aux is already in main_raster_sz (mainH covers both halves)
+            print(f"           shared_aux: no extra advancement")
+            pass
         elif extra_tiles == 3:
             aux_raster_sz = raster_size(aux_w, aux_h, aux_depth)
             aux_pal_sz = palette_size(aux_fmt, aux_depth)
 
             if aux_fmt == 0 and aux_depth == 2:
                 swap16_range(data, aux_start, aux_w * aux_h)
+            elif aux_fmt == 0 and aux_depth == 3:
+                swap32_range(data, aux_start, aux_w * aux_h)
             elif aux_fmt == 3 and aux_depth == 2:
                 swap16_range(data, aux_start, aux_w * aux_h)
 
@@ -653,10 +681,19 @@ def convert_tex_data(data: bytearray):
                 swap16_range(data, aux_start + aux_raster_sz, pal_colors)
 
             aux_start += aux_raster_sz + aux_pal_sz
+            print(f"           indep_aux: raster=0x{aux_raster_sz:X} pal=0x{aux_pal_sz:X}")
 
-        pos = (aux_start + 7) & ~7
+        total_size = aux_start - pos
+        print(f"           total_size=0x{total_size:X} next_pos=0x{aux_start:X}")
+
+        pos = aux_start
+        tex_idx += 1
         if pos <= raster_start:
+            print(f"    [tex] ERROR: pos went backwards! pos=0x{pos:X} <= raster_start=0x{raster_start:X}")
             break
+
+    print(f"    [convert_tex_data] processed {tex_idx} textures, final pos=0x{pos:X}")
+
 
 def convert_bg_data(data: bytearray, pal_count: int = 1):
     if len(data) < 16:
@@ -717,7 +754,7 @@ def convert_title_data(data: bytearray, textures: List):
 def convert_mapfs_entry(data: bytes, name: str, config: MapFSConfig) -> bytes:
     # Shape files use the dedicated converter with relocation table
     if name.endswith("_shape"):
-        return convert_shape_le(data, debug=True)
+        return convert_shape_le(data, debug=False)
 
     # BG files use the dedicated converter with relocation table
     if name.endswith("_bg"):
@@ -1120,7 +1157,56 @@ def main():
             out_path.write_bytes(result)
             converted.append((seg_name, start, end, len(result)))
 
-    print(f"\nGenerating vrom_table.h...")
+    # =================================================================
+    # Extract all remaining ROM segments into the VROM table.
+    # These are segments like title_bg_1, entity models, etc. that
+    # the game DMA's from but aren't one of the 6 converter types.
+    # Data that is only single bytes (CI8 rasters) works as-is.
+    # Palette segments (_pal) get their u16s swapped.
+    # =================================================================
+    print(f"\nExtracting remaining ROM segments...")
+
+    paired = {}
+    for sym, addr in symbols.items():
+        if sym.endswith("_ROM_START"):
+            base = sym[:-len("_ROM_START")]
+            paired.setdefault(base, {})["start"] = addr
+        elif sym.endswith("_ROM_END"):
+            base = sym[:-len("_ROM_END")]
+            paired.setdefault(base, {})["end"] = addr
+
+    already_done = {s[0] for s in converted}
+    already_done.add('mapfs')
+
+    extra_count = 0
+    for base, addrs in sorted(paired.items()):
+        if "start" not in addrs or "end" not in addrs:
+            continue
+        start = addrs["start"]
+        end = addrs["end"]
+        size = end - start
+        if size <= 0 or base in already_done:
+            continue
+        if start >= len(rom_data) or end > len(rom_data):
+            continue
+        if start >= 0x80000000:
+            continue
+
+        seg_data = bytearray(rom_data[start:end])
+
+        # Palette segments are pure u16 RGBA data - swap them
+        if base.endswith("_pal"):
+            swap16_range(seg_data, 0, len(seg_data) // 2)
+
+        out_path = OUT_DIR / f"{base}.bin"
+        out_path.write_bytes(bytes(seg_data))
+        converted.append((base, start, end, size))
+        extra_count += 1
+
+    print(f"  Extracted {extra_count} additional segments")
+
+    # Now the VROM table includes everything
+    print(f"\nGenerating vrom_table.h ({len(converted)} entries)...")
     generate_vrom_table(converted, OUT_DIR / "vrom_table.h")
 
     print(f"Generating pc_rom_addrs.ld...")

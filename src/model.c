@@ -2062,7 +2062,11 @@ void load_texture_by_name(ModelNodeProperty* propertyName, s32 romOffset, s32 si
 
     while (romOffset < startOffset + size) {
         dma_copy((u8*)romOffset, (u8*)romOffset + sizeof(gCurrentTextureHeader), &gCurrentTextureHeader);
-        header = &gCurrentTextureHeader;
+        header = &gCurrentTextureHeader;    /// <-- this is 2064
+
+                printf("[load_tex] romOff=0x%X name='%.32s' mainW=%u mainH=%u extraTiles=%u fmt=%u depth=%u (searching '%s')\n",
+               (u32)romOffset, header->name, header->mainW, header->mainH,
+               header->extraTiles, header->mainFmt, header->mainBitDepth, textureName);
 
         rasterSize = header->mainW * header->mainH;
 
@@ -2147,6 +2151,11 @@ void load_texture_by_name(ModelNodeProperty* propertyName, s32 romOffset, s32 si
 
         textureIdx++;
         mainSize = rasterSize + paletteSize + sizeof(*header);
+                printf("[load_tex]   rasterSz=0x%X palSz=0x%X mainSz=0x%X auxR=0x%X auxP=0x%X next=0x%X\n",
+               rasterSize, paletteSize, mainSize, auxRasterSize, auxPaletteSize,
+               (u32)(romOffset + mainSize + auxRasterSize + auxPaletteSize));
+
+
         romOffset += mainSize;
         romOffset += auxRasterSize + auxPaletteSize;
     }
