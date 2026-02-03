@@ -323,9 +323,6 @@ OS_SRCS := \
     src/os/sptaskyielded.c \
     src/os/startthread.c \
     src/os/stopthread.c \
-    src/os/strcmp.c \
-    src/os/strcpy.c \
-    src/os/string.c \
     src/os/thread.c \
     src/os/timerintr.c \
     src/os/vi.c \
@@ -422,7 +419,7 @@ ALL_OBJS := $(SRC_OBJS) $(VER_OBJS)
 all: $(TARGET)
 
 $(TARGET): $(ALL_OBJS)
-	$(CC) -m32 $(ALL_OBJS) -o $@ -lSDL2 -lGL -lm -Wl,--just-symbols=assets_le/pc_rom_addrs.ld
+	$(CC) -no-pie -m32 $(ALL_OBJS) -o $@ -lSDL2 -lGL -lm -Wl,--just-symbols=assets_le/pc_rom_addrs.ld
 
 
 $(BUILD_DIR)/src/%.o: src/%.c

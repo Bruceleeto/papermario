@@ -93,6 +93,8 @@ void boot_main(void* data) {
 #ifndef LINUX
     nuGfxInit();
     gGameStatusPtr->contBitPattern = nuContInit();
+#else
+    gGameStatusPtr->contBitPattern |= 1;
 #endif
 
 #if !VERSION_IQUE && !defined(LINUX)
