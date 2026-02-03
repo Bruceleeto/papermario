@@ -17,7 +17,8 @@ import re
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
 import sys
-
+from shape_convert import convert_shape_le
+from bg_convert import convert_bg_le
 try:
     import yaml
     HAS_YAML = True
@@ -29,6 +30,7 @@ try:
     HAS_CRUNCH64 = True
 except ImportError:
     HAS_CRUNCH64 = False
+
 
 # =============================================================================
 # Configuration
@@ -499,105 +501,11 @@ def convert_sprites_segment(data: bytes) -> bytes:
 # MapFS Converter
 # =============================================================================
 
-def convert_shape_data(data: bytearray):
-    if len(data) < 20:
-        return
-
-    display_list_ptr = read_u32_be(data, 0)
-    group_list_ptr = read_u32_be(data, 4)
-    property_list_ptr = read_u32_be(data, 8)
-    vertex_list_ptr = read_u32_be(data, 12)
-
-    swap32_range(data, 0, 5)
-
-    ptrs = [p for p in [display_list_ptr, group_list_ptr, property_list_ptr, len(data)]
-            if p > vertex_list_ptr and p < len(data)]
-    vertex_end = min(ptrs) if ptrs else len(data)
-
-    if vertex_list_ptr > 0 and vertex_list_ptr < len(data):
-        pos = vertex_list_ptr
-        while pos + 16 <= vertex_end:
-            swap16_range(data, pos, 6)
-            pos += 16
-
-    if display_list_ptr > 0 and display_list_ptr < len(data):
-        pos = display_list_ptr
-        while pos + 8 <= len(data):
-            cmd = data[pos]
-            swap32(data, pos)
-            swap32(data, pos + 4)
-            if cmd == 0xDF:
-                break
-            pos += 8
-            if pos > display_list_ptr + 0x100000:
-                break
-
-    if group_list_ptr > 0 and group_list_ptr < len(data):
-        convert_model_groups(data, group_list_ptr, set())
-
-    if property_list_ptr > 0 and property_list_ptr < len(data):
-        pos = property_list_ptr
-        while pos + 4 <= len(data):
-            val = read_u32_be(data, pos)
-            swap32(data, pos)
-            if val == 0:
-                break
-            pos += 4
-
-def convert_model_groups(data: bytearray, offset: int, visited: set):
-    if offset in visited or offset + 20 > len(data):
-        return
-    visited.add(offset)
-
-    child_ptr = read_u32_be(data, offset + 4)
-    sibling_ptr = read_u32_be(data, offset + 8)
-
-    swap32_range(data, offset, 5)
-
-    if child_ptr > 0 and child_ptr < len(data):
-        convert_model_groups(data, child_ptr, visited)
-    if sibling_ptr > 0 and sibling_ptr < len(data):
-        convert_model_groups(data, sibling_ptr, visited)
-
 def convert_hit_data(data: bytearray):
-    """Convert hit/collision data from BE to LE.
-
-    File layout:
-      HitFile (top-level, offset 0):
-        u32 collisionOffset
-        u32 zoneOffset
-
-      HitFileHeader (at collisionOffset and/or zoneOffset):
-        s16 numColliders;      +0x00
-        pad[2];                +0x02
-        s32 collidersOffset;   +0x04
-        s16 numVertices;       +0x08
-        pad[2];                +0x0A
-        s32 verticesOffset;    +0x0C
-        s16 bbDataSize;        +0x10
-        pad[2];                +0x12
-        s32 bbOffset;          +0x14
-
-      All sub-offsets are relative to the start of the file (the HitFile pointer).
-
-      Data blocks referenced:
-        - Bounding boxes: u32[bbDataSize]        at bbOffset
-        - Vertices:       Vec3s[numVertices]     at verticesOffset  (Vec3s = 3×s16, 6 bytes)
-        - Colliders:      HitAssetCollider[numColliders] at collidersOffset
-
-      HitAssetCollider (0x0C bytes):
-        s16 boundingBoxOffset; +0x00
-        s16 nextSibling;       +0x02
-        s16 firstChild;        +0x04
-        s16 numTriangles;      +0x06
-        s32 trianglesOffset;   +0x08
-
-      Triangle data: s32[numTriangles] at trianglesOffset (packed vertex indices + flags)
-    """
+    """Convert hit/collision data from BE to LE."""
     if len(data) < 8:
         return
 
-    # --- HitFile header ---
     collision_offset = read_u32_be(data, 0)
     zone_offset      = read_u32_be(data, 4)
     swap32(data, 0)
@@ -609,7 +517,6 @@ def convert_hit_data(data: bytearray):
 
         hdr = section_offset
 
-        # --- Read HitFileHeader (before swapping) ---
         num_colliders    = read_i16_be(data, hdr + 0x00)
         colliders_offset = read_i32_be(data, hdr + 0x04)
         num_vertices     = read_i16_be(data, hdr + 0x08)
@@ -617,44 +524,34 @@ def convert_hit_data(data: bytearray):
         bb_data_size     = read_i16_be(data, hdr + 0x10)
         bb_offset        = read_i32_be(data, hdr + 0x14)
 
-        # --- Swap HitFileHeader ---
-        swap16(data, hdr + 0x00)   # numColliders  (s16)
-        # 0x02-0x03 = padding
-        swap32(data, hdr + 0x04)   # collidersOffset (s32)
-        swap16(data, hdr + 0x08)   # numVertices   (s16)
-        # 0x0A-0x0B = padding
-        swap32(data, hdr + 0x0C)   # verticesOffset (s32)
-        swap16(data, hdr + 0x10)   # bbDataSize    (s16)
-        # 0x12-0x13 = padding
-        swap32(data, hdr + 0x14)   # bbOffset      (s32)
+        swap16(data, hdr + 0x00)
+        swap32(data, hdr + 0x04)
+        swap16(data, hdr + 0x08)
+        swap32(data, hdr + 0x0C)
+        swap16(data, hdr + 0x10)
+        swap32(data, hdr + 0x14)
 
-        # --- Bounding boxes: u32[bbDataSize] ---
         if bb_offset > 0 and bb_offset < len(data) and bb_data_size > 0:
             swap32_range(data, bb_offset, bb_data_size)
 
-        # --- Vertices: Vec3s[numVertices]  (3 × s16 = 6 bytes each) ---
         if vertices_offset > 0 and vertices_offset < len(data) and num_vertices > 0:
             swap16_range(data, vertices_offset, num_vertices * 3)
 
-        # --- Colliders: HitAssetCollider[numColliders] ---
         if colliders_offset > 0 and colliders_offset < len(data) and num_colliders > 0:
             for c in range(num_colliders):
                 cpos = colliders_offset + c * 0x0C
                 if cpos + 0x0C > len(data):
                     break
 
-                # Read triangle info before swapping
                 num_triangles    = read_i16_be(data, cpos + 0x06)
                 triangles_offset = read_i32_be(data, cpos + 0x08)
 
-                # Swap HitAssetCollider fields
-                swap16(data, cpos + 0x00)   # boundingBoxOffset (s16)
-                swap16(data, cpos + 0x02)   # nextSibling       (s16)
-                swap16(data, cpos + 0x04)   # firstChild        (s16)
-                swap16(data, cpos + 0x06)   # numTriangles      (s16)
-                swap32(data, cpos + 0x08)   # trianglesOffset   (s32)
+                swap16(data, cpos + 0x00)
+                swap16(data, cpos + 0x02)
+                swap16(data, cpos + 0x04)
+                swap16(data, cpos + 0x06)
+                swap32(data, cpos + 0x08)
 
-                # --- Triangle data: s32[numTriangles] ---
                 if (triangles_offset > 0 and triangles_offset < len(data)
                         and num_triangles > 0):
                     swap32_range(data, triangles_offset, num_triangles)
@@ -818,17 +715,21 @@ def convert_title_data(data: bytearray, textures: List):
                     swap16_range(data, pal_pos, pal_size)
 
 def convert_mapfs_entry(data: bytes, name: str, config: MapFSConfig) -> bytes:
+    # Shape files use the dedicated converter with relocation table
+    if name.endswith("_shape"):
+        return convert_shape_le(data, debug=True)
+
+    # BG files use the dedicated converter with relocation table
+    if name.endswith("_bg"):
+        pal_count = config.get_pal_count(name)
+        return convert_bg_le(data, pal_count)
+
     out = bytearray(data)
 
-    if name.endswith("_shape"):
-        convert_shape_data(out)
-    elif name.endswith("_hit"):
+    if name.endswith("_hit"):
         convert_hit_data(out)
     elif name.endswith("_tex"):
         convert_tex_data(out)
-    elif name.endswith("_bg"):
-        pal_count = config.get_pal_count(name)
-        convert_bg_data(out, pal_count)
     elif name.startswith("party_"):
         convert_party_data(out)
     elif name == "title_data":
@@ -1080,14 +981,7 @@ def convert_icon_segment_heuristic(data: bytes) -> bytes:
 # =============================================================================
 
 def convert_logos_segment(data: bytes) -> bytes:
-    """Convert logos segment - raw RGBA16 texture data, swap every 16-bit word.
-
-    Layout (from state_logos.c):
-      0x00000: Image1 - N64 logo       128x112 RGBA16 = 0x7000 bytes
-      0x07000: Image3 - IS logo         256x112 RGBA16 = 0xE000 bytes
-      0x15000: Image2 - Nintendo logo   256x48  RGBA16 = 0x6000 bytes
-    Total expected: 0x1B000 bytes
-    """
+    """Convert logos segment - raw RGBA16 texture data, swap every 16-bit word."""
     out = bytearray(data)
 
     total_pixels = len(data) // 2
@@ -1095,7 +989,6 @@ def convert_logos_segment(data: bytes) -> bytes:
 
     swap16_range(out, 0, total_pixels)
 
-    # Log sub-image layout for debugging
     if len(data) >= 0x1B000:
         print(f"    Image1 (N64 logo):      0x00000 - 0x07000  128x112")
         print(f"    Image3 (IS logo):        0x07000 - 0x15000  256x112")
@@ -1249,13 +1142,10 @@ def generate_linker_symbols(segments: List[Tuple[str, int, int, int]], symbols: 
         f.write("/* Auto-generated by convert_assets_le.py */\n")
         f.write("/* Absolute symbols so address-of == value, matching N64 linker behavior */\n\n")
 
-        # Emit symbols for every segment we converted
         for name, start, end, pc_size in segments:
             f.write(f"{name}_ROM_START = 0x{start:08X};\n")
             f.write(f"{name}_ROM_END = 0x{end:08X};\n")
 
-        # Also scan the map file for any other _ROM_START/_ROM_END pairs
-        # that the game code might reference
         f.write("\n/* Additional segments from map file */\n")
         emitted = {s[0] for s in segments}
         paired = {}
@@ -1273,7 +1163,6 @@ def generate_linker_symbols(segments: List[Tuple[str, int, int, int]], symbols: 
             if "start" in addrs and "end" in addrs:
                 f.write(f"{base}_ROM_START = 0x{addrs['start']:08X};\n")
                 f.write(f"{base}_ROM_END = 0x{addrs['end']:08X};\n")
-
 
 
 if __name__ == "__main__":

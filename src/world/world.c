@@ -8,6 +8,11 @@
 #include "model.h"
 #include "gcc/string.h"
 #include <stdio.h>
+#ifdef LINUX
+#include "shape_relocate.h"
+#endif
+
+
 s32 WorldReverbModeMapping[] = { 0, 1, 2, 3 };
 
 //TODO possible data split here
@@ -157,6 +162,10 @@ void load_map_by_IDs(s16 areaID, s16 mapID, s16 loadType) {
 
 #ifdef LINUX
         memcpy(shapeFile, yay0Asset, decompressedSize);
+        shape_relocate(shapeFile, decompressedSize);
+            printf("shape base=%p root=%p\n", (void*)shapeFile, (void*)shapeFile->header.root);
+
+
 #else
         decode_yay0(yay0Asset, shapeFile);
 #endif

@@ -2,6 +2,11 @@
 #include "model.h"
 #include "gcc/string.h"
 
+#ifdef LINUX
+#include "bg_relocate.h"
+#endif
+
+
 char gCloudyFlowerFieldsBg[] = "fla_bg";
 char gSunnyFlowerFieldsBg[] = "flb_bg";
 s8 gBackroundWaveEnabled = false;
@@ -30,6 +35,7 @@ void load_map_bg(char* optAssetName) {
         compressedData = load_asset_by_name(assetName, &assetSize);
 #ifdef LINUX
         memcpy(&gBackgroundImage, compressedData, assetSize);
+        bg_relocate(&gBackgroundImage, assetSize);
 #else
         decode_yay0(compressedData, &gBackgroundImage);
 #endif
