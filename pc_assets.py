@@ -1074,9 +1074,11 @@ static inline const VromEntry* vrom_find(u32 addr) {
 
     with open(out_path, 'w') as f:
         f.write(header)
-        for name, start, end, pc_size in segments:
+        for name, start, end, pc_size in sorted(segments, key=lambda s: s[1]):
             f.write(f'    {{ 0x{start:08X}, 0x{end:08X}, 0x{pc_size:X}, "{name}.bin" }},\n')
         f.write(footer)
+
+
 
 # =============================================================================
 # Main
@@ -1157,55 +1159,6 @@ def main():
             out_path.write_bytes(result)
             converted.append((seg_name, start, end, len(result)))
 
-    # =================================================================
-    # Extract all remaining ROM segments into the VROM table.
-    # These are segments like title_bg_1, entity models, etc. that
-    # the game DMA's from but aren't one of the 6 converter types.
-    # Data that is only single bytes (CI8 rasters) works as-is.
-    # Palette segments (_pal) get their u16s swapped.
-    # =================================================================
-    print(f"\nExtracting remaining ROM segments...")
-
-    paired = {}
-    for sym, addr in symbols.items():
-        if sym.endswith("_ROM_START"):
-            base = sym[:-len("_ROM_START")]
-            paired.setdefault(base, {})["start"] = addr
-        elif sym.endswith("_ROM_END"):
-            base = sym[:-len("_ROM_END")]
-            paired.setdefault(base, {})["end"] = addr
-
-    already_done = {s[0] for s in converted}
-    already_done.add('mapfs')
-
-    extra_count = 0
-    for base, addrs in sorted(paired.items()):
-        if "start" not in addrs or "end" not in addrs:
-            continue
-        start = addrs["start"]
-        end = addrs["end"]
-        size = end - start
-        if size <= 0 or base in already_done:
-            continue
-        if start >= len(rom_data) or end > len(rom_data):
-            continue
-        if start >= 0x80000000:
-            continue
-
-        seg_data = bytearray(rom_data[start:end])
-
-        # Palette segments are pure u16 RGBA data - swap them
-        if base.endswith("_pal"):
-            swap16_range(seg_data, 0, len(seg_data) // 2)
-
-        out_path = OUT_DIR / f"{base}.bin"
-        out_path.write_bytes(bytes(seg_data))
-        converted.append((base, start, end, size))
-        extra_count += 1
-
-    print(f"  Extracted {extra_count} additional segments")
-
-    # Now the VROM table includes everything
     print(f"\nGenerating vrom_table.h ({len(converted)} entries)...")
     generate_vrom_table(converted, OUT_DIR / "vrom_table.h")
 
