@@ -162,8 +162,7 @@ static GLuint load_texture(u32 addr, u32 fmt, u32 siz, u32 w, u32 h) {
                 raw[8],raw[9],raw[10],raw[11],raw[12],raw[13],raw[14],raw[15]);
         }
         for (i = 0; i < w * h; i++) {
-            u16 raw = s[i];
-            u16 p = (raw >> 8) | (raw << 8); /* BE to LE */
+            u16 p = s[i];
             u8 r = ((p >> 11) & 0x1F) << 3;
             u8 g = ((p >> 6) & 0x1F) << 3;
             u8 b = ((p >> 1) & 0x1F) << 3;
