@@ -300,13 +300,14 @@ void nuPiReadRom(u32 rom_addr, void* buf_ptr, u32 size) {
     entry = vrom_find(rom_addr);
 
     if (!entry) {
-        // On PC, addresses not in VROM table may be direct memory pointers
-        // (e.g. texture data loaded into a heap buffer by get_asset_offset)
-        if (rom_addr >= 0x1000 && rom_addr < 0x80000000) {
+        // get_asset_offset returns heap buffer pointers as "ROM addresses".
+        // These will be above the program's load address (typically 0x08000000+
+        // on 32-bit Linux). Real ROM addresses are below 0x02000000.
+        if (rom_addr >= 0x08000000 && rom_addr < 0x80000000) {
             memcpy(buf_ptr, (void*)(uintptr_t)rom_addr, size);
             return;
         }
-        printf("nuPiReadRom: unknown addr 0x%08X size 0x%X\n", rom_addr, size);
+        printf("nuPiReadRom: MISSING asset at ROM 0x%08X size 0x%X\n", rom_addr, size);
         memset(buf_ptr, 0, size);
         return;
     }

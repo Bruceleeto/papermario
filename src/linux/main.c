@@ -22,6 +22,8 @@ static float sProjection[4][4];
 static float sMVP[4][4];
 static u16 sTexScaleS = 0xFFFF;
 static u16 sTexScaleT = 0xFFFF;
+static u32 sOtherModeH = 0;
+
 
 // Vertex buffer
 typedef struct {
@@ -342,37 +344,56 @@ static void draw_tri(int v0, int v1, int v2) {
 // Draw a textured or colored rectangle (handles G_TEXRECT)
 static void draw_tex_rect(u32 xh, u32 yh, u32 tile, u32 xl, u32 yl,
                            u32 s, u32 t, u32 dsdx, u32 dtdy) {
-    float x0 = xl / 4.0f;
-    float y0 = yl / 4.0f;
-    float x1 = xh / 4.0f;
-    float y1 = yh / 4.0f;
-    float s0, t0, s1, t1;
     TileDescriptor* td = &sTiles[tile & 7];
+    float x0, y0, x1, y1;
+    float s0, t0, s1, t1;
     float tw, th;
     s16 ss = (s16)s, st = (s16)t;
     s16 sdsdx = (s16)dsdx, sdtdy = (s16)dtdy;
 
-  //  if (sFrameCount < 15) {
-    //    printf("[DRAWTEX] rect=(%.1f,%.1f)-(%.1f,%.1f) tile=%u texID=%u texAddr=%p texW=%u texH=%u\n",
-      //      x0, y0, x1, y1, tile, td->texID, (void*)(uintptr_t)td->texAddr, td->texW, td->texH);
-   // }
-
-    // Ensure the tile has a GL texture
     tile_ensure_texture(tile & 7);
 
     tw = (td->texW > 0) ? (float)td->texW : 1.0f;
     th = (td->texH > 0) ? (float)td->texH : 1.0f;
 
-    // s,t are S10.5 fixed point; dsdx,dtdy are S5.10 fixed point
-    s0 = (ss / 32.0f) / tw;
-    t0 = (st / 32.0f) / th;
-    s1 = s0 + ((x1 - x0) * sdsdx / 1024.0f) / tw;
-    t1 = t0 + ((y1 - y0) * sdtdy / 1024.0f) / th;
+    if (sCycleType == G_CYC_COPY) {
+        // In copy mode, coordinates have different precision
+        // xh/xl are in 10.2, and the hardware adds 1 to xh
+        x0 = xl / 4.0f;
+        y0 = yl / 4.0f;
+        x1 = (xh + 4) / 4.0f;  // +1 pixel in copy mode
+        y1 = (yh + 4) / 4.0f;
+
+        // dsdx is 4096 = 1:1, so just compute from pixel width
+        float pixW = x1 - x0;
+        float pixH = y1 - y0;
+
+        s0 = (ss / 32.0f) / tw;
+        t0 = (st / 32.0f) / th;
+        s1 = s0 + pixW / tw;
+        t1 = t0 + pixH / th;
+    } else {
+        x0 = xl / 4.0f;
+        y0 = yl / 4.0f;
+        x1 = xh / 4.0f;
+        y1 = yh / 4.0f;
+
+        s0 = (ss / 32.0f) / tw;
+        t0 = (st / 32.0f) / th;
+        s1 = s0 + ((x1 - x0) * sdsdx / 1024.0f) / tw;
+        t1 = t0 + ((y1 - y0) * sdtdy / 1024.0f) / th;
+    }
 
     if (td->texID) {
         glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, td->texID);
+        // Copy mode uses point sampling
+        if (sCycleType == G_CYC_COPY) {
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        }
     }
+
     glDisable(GL_DEPTH_TEST);
     glColor4f(1, 1, 1, 1);
     glBegin(GL_QUADS);
@@ -383,6 +404,7 @@ static void draw_tex_rect(u32 xh, u32 yh, u32 tile, u32 xl, u32 yl,
     glEnd();
     glEnable(GL_DEPTH_TEST);
 }
+
 
 static void walk_dl(Gfx* dl, int depth) {
     int i;
@@ -505,16 +527,44 @@ static void walk_dl(Gfx* dl, int depth) {
                 sTiles[0].texAddr = sCurTexAddr;
             } break;
 
-            case G_LOADBLOCK:
-                // Simplified: record dimensions from the block load
-                // The subsequent G_SETTILE + G_SETTILESIZE will set up the render tile
-                break;
+               case G_LOADBLOCK: {
+                int tile_idx = (w1 >> 24) & 0x7;
+                u32 texels = ((w1 >> 12) & 0xFFF) + 1;
+                TileDescriptor* td = &sTiles[tile_idx];
+                td->texAddr = sCurTexAddr;
+                td->fmt = sCurTexFmt;
+                td->siz = sCurTexSiz;
+                // Width comes from the preceding G_SETTILE's line field
+                // or from G_SETTIMG width. Height = texels / width.
+                if (sCurTexWidth > 0) {
+                    td->texW = sCurTexWidth;
+                    td->texH = texels / sCurTexWidth;
+                    if (td->texH < 1) td->texH = 1;
+                }
+                // Propagate to render tile if this is the load tile
+                if (tile_idx == 7) {
+                    sTiles[0].texAddr = sCurTexAddr;
+                    sTiles[0].fmt = sCurTexFmt;
+                    sTiles[0].siz = sCurTexSiz;
+                    sTiles[0].texW = td->texW;
+                    sTiles[0].texH = td->texH;
+                }
+            } break;
 
             case G_LOADTLUT: {
+                int tile_idx = (w1 >> 24) & 0x7;
                 int count = ((w1 >> 14) & 0x3FF) + 1;
                 void* data = pc_resolve_addr(sCurTexAddr);
                 if (data && count <= 256) {
-                    memcpy(sTLUT, data, count * 2);
+                    u16* src = (u16*)data;
+                    int offset = sTiles[tile_idx].tmem - 256;
+                    if (offset < 0) offset = 0;
+                    int j;
+                    for (j = 0; j < count && (offset + j) < 256; j++) {
+                        u16 raw = src[j];
+                        // Byte-swap BE to LE
+                        sTLUT[offset + j] = (raw >> 8) | (raw << 8);
+                    }
                 }
             } break;
 

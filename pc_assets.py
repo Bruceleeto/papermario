@@ -1080,6 +1080,52 @@ static inline const VromEntry* vrom_find(u32 addr) {
 
 
 
+
+# =============================================================================
+# Raw ROM Segment Extraction - table-driven
+# =============================================================================
+
+RAW_SEGMENTS = [
+    ("title_bg_1",     "none"),
+    ("title_bg_1_pal", "swap16"),
+    ("title_bg_2",     "none"),
+    ("title_bg_2_pal", "swap16"),
+    ("title_bg_3",     "none"),
+    ("title_bg_3_pal", "swap16"),
+    ("title_bg_4",     "none"),
+    ("title_bg_4_pal", "swap16"),
+    ("title_tape",                  "none"),
+    ("title_bowser_silhouette",     "none"),
+    ("title_bowser_silhouette_pal", "swap16"),
+]
+
+def extract_raw_segments(rom_data: bytes, symbols: Dict[str, int]) -> List[Tuple[str, int, int, int]]:
+    results = []
+    print(f"\nExtracting {len(RAW_SEGMENTS)} raw ROM segments...")
+    for name, swap_type in RAW_SEGMENTS:
+        start_sym = f"{name}_ROM_START"
+        end_sym = f"{name}_ROM_END"
+        if start_sym not in symbols or end_sym not in symbols:
+            print(f"  {name}: symbols not found, skipping")
+            continue
+        start = symbols[start_sym]
+        end = symbols[end_sym]
+        size = end - start
+        if size <= 0 or start >= len(rom_data) or end > len(rom_data):
+            print(f"  {name}: invalid bounds, skipping")
+            continue
+        seg = bytearray(rom_data[start:end])
+        if swap_type == "swap16":
+            swap16_range(seg, 0, len(seg) // 2)
+        elif swap_type == "swap32":
+            swap32_range(seg, 0, len(seg) // 4)
+        out_path = OUT_DIR / f"{name}.bin"
+        out_path.write_bytes(bytes(seg))
+        results.append((name, start, end, size))
+        swap_label = f" [{swap_type}]" if swap_type != "none" else ""
+        print(f"  {name}: 0x{start:08X}-0x{end:08X} ({size:,} bytes){swap_label}")
+    return results
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -1159,9 +1205,10 @@ def main():
             out_path.write_bytes(result)
             converted.append((seg_name, start, end, len(result)))
 
+    converted += extract_raw_segments(rom_data, symbols)
+
     print(f"\nGenerating vrom_table.h ({len(converted)} entries)...")
     generate_vrom_table(converted, OUT_DIR / "vrom_table.h")
-
     print(f"Generating pc_rom_addrs.ld...")
     generate_linker_symbols(converted, symbols, OUT_DIR / "pc_rom_addrs.ld")
 
